@@ -84,43 +84,60 @@ const generateMockData = (basePrice) => {
 };
 
 const App = () => {
+  // Master States
   const [masterStocks, setMasterStocks] = useState([]);
   const [myWatchlist, setMyWatchlist] = useState([]);
   const [selectedStock, setSelectedStock] = useState(null);
   const [chartData, setChartData] = useState([]);
   
+  // UI States
   const [isLoading, setIsLoading] = useState(true);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [syncTime, setSyncTime] = useState('');
 
-  // [Step 1] Initial Sync Process
+  // [Step 1] Initial Data Acquisition (Master Sync)
   useEffect(() => {
-    const syncMasterData = async () => {
+    const syncWithKRX = async () => {
       setIsLoading(true);
       setTimeout(() => {
         setMasterStocks(MOCK_KRX_MASTER_DATA);
-        // Default onboarding list
+        // Onboarding default stocks
         const initialOnboard = MOCK_KRX_MASTER_DATA.slice(0, 5).map(s => ({
           ...s, ...fetchStockDetail(s.code)
         }));
         setMyWatchlist(initialOnboard);
         setSelectedStock(initialOnboard[0]);
+        setSyncTime(new Date().toLocaleTimeString());
         setIsLoading(false);
       }, 1000);
     };
-    syncMasterData();
+    syncWithKRX();
   }, []);
 
-  // [Step 3] Detailed Fetch on Selection
+  // [Step 3] Update Chart & Reports on Selection
   useEffect(() => {
     if (selectedStock) {
       setChartData(generateMockData(selectedStock.price));
     }
   }, [selectedStock]);
 
+  const calculateMA = (data, period) => {
+    return data.map((val, idx) => {
+      if (idx < period - 1) return null;
+      const slice = data.slice(idx - period + 1, idx + 1);
+      const sum = slice.reduce((acc, curr) => acc + curr.close, 0);
+      return sum / period;
+    });
+  };
+
+  const ma5 = useMemo(() => calculateMA(chartData, 5), [chartData]);
+  const ma10 = useMemo(() => calculateMA(chartData, 10), [chartData]);
+  const ma20 = useMemo(() => calculateMA(chartData, 20), [chartData]);
+
   const analysis = useMemo(() => {
-    if (chartData.length < 3) return { trend: '분석 중', pattern: '수집 중' };
+    if (chartData.length < 3) return { trend: '분석중', pattern: '수집중' };
     const last = chartData[chartData.length - 1];
     const prev = chartData[chartData.length - 2];
     
@@ -128,7 +145,7 @@ const App = () => {
     if (!prev.isBullish && last.isBullish && last.open <= prev.close && last.close >= prev.open) {
       return { 
         trend: '상승세 초입', pattern: '상승장악형 (Bullish Engulfing)', 
-        signal: '매수', desc: '바닥권에서 양봉이 전일 음봉을 완전히 감싸 안으며 강력한 반등 신호를 형성했습니다.' 
+        signal: '매수', desc: '바닥권에서 양봉이 직전 음봉의 몸통을 완전히 감싸 안으며 강력한 반전 시그널을 형성했습니다.' 
       };
     }
     // Hammer
@@ -137,10 +154,10 @@ const App = () => {
     if (lowerShadow > bodySize * 2 && (last.high - Math.max(last.open, last.close)) < bodySize * 0.5) {
       return { 
         trend: '상승 반전 예고', pattern: '망치형 (Hammer)', 
-        signal: '매수 대기', desc: '저가에서 매수세가 강하게 유입되었습니다. 익일 시가 상승 시 강한 추세 전환이 예상됩니다.' 
+        signal: '매수 대기', desc: '저가권에서 강력한 저점 매수세가 유입되었습니다. 익일 시가 돌파 시 추세 전환이 확정됩니다.' 
       };
     }
-    return { trend: '추세 유지', pattern: '중립적 흐름', signal: '보유/관망', desc: '현재 주요 반전 패턴은 발견되지 않았습니다. 이동평균선의 지지력을 확인하며 관망하십시오.' };
+    return { trend: '추세 유지', pattern: '중립형', signal: '보유/관망', desc: '현재 뚜렷한 반전 패턴은 보이지 않으나, 이동평균선의 지지 여부를 체크하며 보유 전략을 유지하십시오.' };
   }, [chartData]);
 
   /**
@@ -148,29 +165,30 @@ const App = () => {
    * Filters from Master and fetches detail.
    */
   const handleAddStock = (stock) => {
-    const isAdded = myWatchlist.find(s => s.code === stock.code);
-    if (!isAdded) {
-      const details = fetchStockDetail(stock.code);
-      const newStock = { ...stock, ...details };
-      setMyWatchlist([newStock, ...myWatchlist]);
-      setSelectedStock(newStock);
+    const existing = myWatchlist.find(s => s.code === stock.code);
+    if (!existing) {
+      const details = fetchStockDetail(stock.code); // 상세 정보 조회
+      const integratedStock = { ...stock, ...details };
+      setMyWatchlist([integratedStock, ...myWatchlist]);
+      setSelectedStock(integratedStock);
     } else {
-      setSelectedStock(isAdded);
+      setSelectedStock(existing);
     }
     setIsSearchModalOpen(false);
     setSearchQuery('');
   };
 
-  const filteredMaster = masterStocks.filter(s => 
+  // [Step 2] Local Filtering Process
+  const filteredSearch = masterStocks.filter(s => 
     s.name.includes(searchQuery) || s.code.includes(searchQuery)
   );
 
   if (isLoading || !selectedStock) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-blue-400">
-        <RefreshCw className="w-16 h-16 animate-spin mb-6" />
-        <h2 className="text-2xl font-black tracking-widest uppercase italic">KRX Data Processing</h2>
-        <p className="text-slate-500 text-sm mt-4 font-bold tracking-tighter">Step 1: 마스터 데이터 동기화 (전종목 지정내역 확보 중)</p>
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-blue-400 p-8">
+        <RefreshCw className="w-16 h-16 animate-spin mb-6 text-blue-500" />
+        <h2 className="text-3xl font-black tracking-tighter uppercase italic">KRX Master Syncing</h2>
+        <p className="text-slate-500 text-sm mt-4 font-bold">Step 1: 마스터 데이터 확보 및 동기화 중...</p>
       </div>
     );
   }
@@ -178,7 +196,7 @@ const App = () => {
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* Sidebar - Watchlist Management */}
+      {/* Sidebar Navigation */}
       <aside className={`${sidebarOpen ? 'w-80' : 'w-24'} bg-white border-r border-slate-200 transition-all duration-500 flex flex-col z-40 shadow-2xl`}>
         <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0">
           <div className={`flex items-center gap-4 ${!sidebarOpen && 'hidden'}`}>
@@ -193,13 +211,13 @@ const App = () => {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-          {/* Add Stock Menu Button */}
+          {/* Add Stock Button */}
           <button 
             onClick={() => setIsSearchModalOpen(true)}
             className={`w-full flex items-center gap-4 bg-indigo-600 text-white p-5 rounded-[1.5rem] hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-95 group ${!sidebarOpen && 'justify-center p-4'}`}
           >
             <Plus className="w-7 h-7 flex-shrink-0 group-hover:rotate-90 transition-transform" />
-            {sidebarOpen && <span className="font-black text-lg tracking-tight">종목 추가 메뉴</span>}
+            {sidebarOpen && <span className="font-black text-lg tracking-tight">신규 종목 추가</span>}
           </button>
 
           <div className={`pt-6 ${!sidebarOpen && 'hidden'}`}>
@@ -235,18 +253,18 @@ const App = () => {
             <div className="w-12 h-12 bg-indigo-100 rounded-2xl border-2 border-white flex items-center justify-center font-black text-indigo-600 shadow-sm text-lg">AI</div>
             {sidebarOpen && (
               <div className="overflow-hidden">
-                <p className="font-black text-sm text-slate-800 truncate">분석 코어 V3.2</p>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter italic">Last Sync: 2026-02-17</p>
+                <p className="font-black text-sm text-slate-800 truncate">분석 엔진 V3.5</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Sync: {syncTime}</p>
               </div>
             )}
           </div>
         </div>
       </aside>
 
-      {/* Main Analysis Display */}
+      {/* Main Analysis Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
         
-        {/* Dashboard Header */}
+        {/* Header */}
         <header className="bg-white border-b border-slate-200 px-12 py-10 flex flex-col md:flex-row md:items-center justify-between gap-8 shadow-sm z-30">
           <div>
             <div className="flex items-center gap-4 mb-3">
@@ -258,7 +276,7 @@ const App = () => {
 
           <div className="flex items-center gap-14">
             <div className="text-right">
-              <p className="text-[11px] text-slate-400 font-black uppercase tracking-[0.25em] mb-3">분석 기준가 (2026-02-17)</p>
+              <p className="text-[11px] text-slate-400 font-black uppercase tracking-[0.25em] mb-3">현재가 (2026-02-17)</p>
               <div className="flex items-end justify-end gap-5">
                 <span className="text-6xl font-black tracking-tighter text-slate-900 leading-none">{selectedStock.price.toLocaleString()}원</span>
                 <div className={`flex items-center font-black text-2xl mb-1 ${selectedStock.change >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
@@ -278,55 +296,107 @@ const App = () => {
           </div>
         </header>
 
-        {/* Scrollable Workspace */}
+        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-12 space-y-12 custom-scrollbar">
           
-          {/* AI Diagnostic Banner */}
-          <div className="bg-slate-900 rounded-[3rem] p-12 flex flex-col lg:flex-row lg:items-center justify-between gap-10 shadow-2xl border border-slate-800">
-            <div className="flex items-center gap-8">
-              <div className="p-6 bg-indigo-600 rounded-[2rem] shadow-xl shadow-indigo-500/20">
-                <PieChart className="w-12 h-12 text-white" />
+          {/* Chart Section */}
+          <section className="bg-white p-12 rounded-[3.5rem] border border-slate-200 shadow-sm relative">
+            <div className="flex flex-col md:flex-row items-center justify-between mb-14 gap-6">
+              <div className="flex items-center gap-5">
+                <div className="p-4 bg-indigo-50 rounded-[1.25rem]">
+                  <TrendingUp className="w-8 h-8 text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="font-black text-2xl text-slate-900">기술적 추세 차트</h3>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Candle & MA Analysis</p>
+                </div>
+              </div>
+              <div className="flex gap-8 text-[11px] font-black uppercase tracking-[0.2em] bg-slate-50 px-8 py-4 rounded-3xl border border-slate-100 shadow-inner">
+                <span className="flex items-center gap-3"><div className="w-8 h-2 bg-black rounded-full"></div> 5일선</span>
+                <span className="flex items-center gap-3"><div className="w-8 h-2 bg-blue-500 rounded-full"></div> 10일선</span>
+                <span className="flex items-center gap-3"><div className="w-8 h-2 bg-orange-500 rounded-full"></div> 20일선</span>
+              </div>
+            </div>
+
+            <div className="w-full h-[500px] bg-slate-50 rounded-[3rem] relative border border-slate-100 flex items-end px-12 py-14 shadow-inner">
+              {chartData.map((d, i) => {
+                const maxH = Math.max(...chartData.map(x => x.high));
+                const minL = Math.min(...chartData.map(x => x.low));
+                const range = maxH - minL;
+                const getY = (price) => ((maxH - price) / range) * 100;
+
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center group relative h-full">
+                    <div className="absolute w-[2px] bg-slate-300 z-0" style={{ top: `${getY(d.high)}%`, bottom: `${100 - getY(d.low)}%` }}></div>
+                    <div 
+                      className={`w-[75%] z-10 rounded-sm shadow-xl transition-all duration-300 ${d.isBullish ? 'bg-red-500' : 'bg-blue-600'}`}
+                      style={{ top: `${getY(Math.max(d.open, d.close))}%`, bottom: `${100 - getY(Math.min(d.open, d.close))}%` }}
+                    ></div>
+                    {ma5[i] && <div className="absolute w-2.5 h-2.5 bg-black rounded-full z-20 border-2 border-white shadow-md" style={{ top: `${getY(ma5[i])}%` }}></div>}
+                    {ma10[i] && <div className="absolute w-2.5 h-2.5 bg-blue-500 rounded-full z-20 border-2 border-white shadow-md" style={{ top: `${getY(ma10[i])}%` }}></div>}
+                    {ma20[i] && <div className="absolute w-2.5 h-2.5 bg-orange-500 rounded-full z-20 border-2 border-white shadow-md" style={{ top: `${getY(ma20[i])}%` }}></div>}
+                    
+                    <div className="hidden group-hover:block absolute -top-28 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] p-6 rounded-3xl shadow-2xl z-50 border border-slate-700 min-w-[160px]">
+                      <p className="font-black text-indigo-400 mb-3 border-b border-slate-700 pb-3 uppercase tracking-widest">{d.date}</p>
+                      <div className="space-y-1">
+                        <p className="flex justify-between font-bold">종가: <span>{Math.round(d.close).toLocaleString()}원</span></p>
+                        <p className="flex justify-between opacity-80">MA20: <span>{ma20[i] ? Math.round(ma20[i]).toLocaleString() : '-'}</span></p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* AI Banner */}
+          <div className="bg-slate-900 rounded-[3.5rem] p-14 flex flex-col lg:flex-row lg:items-center justify-between gap-12 shadow-2xl border border-slate-800">
+            <div className="flex items-center gap-10">
+              <div className="p-8 bg-indigo-600 rounded-[2.5rem] shadow-2xl shadow-indigo-500/30">
+                <PieChart className="w-14 h-14 text-white" />
               </div>
               <div>
-                <p className="text-indigo-400 text-[11px] font-black uppercase tracking-[0.4em] mb-3">AI Engine Diagnostic Status</p>
-                <h4 className="text-4xl font-black text-white leading-tight">{selectedStock.name} 현재 추세: <span className="text-indigo-400">[{analysis.trend}]</span></h4>
+                <p className="text-indigo-400 text-xs font-black uppercase tracking-[0.5em] mb-4 italic">AI Core Diagnostic Engine</p>
+                <h4 className="text-5xl font-black text-white leading-tight tracking-tighter">
+                  {selectedStock.name} 추세 <span className="text-indigo-400">[{analysis.trend}]</span>
+                </h4>
               </div>
             </div>
             <div className="flex flex-col items-start lg:items-end">
-              <p className="text-[11px] text-slate-500 font-black uppercase tracking-widest mb-4">Core Signal Matching</p>
-              <div className="bg-slate-800 px-10 py-5 rounded-3xl border border-slate-700 font-black text-xl text-slate-200 shadow-inner tracking-tight italic">
+              <p className="text-[11px] text-slate-500 font-black uppercase tracking-[0.2em] mb-5">Detected Pattern</p>
+              <div className="bg-slate-800 px-12 py-6 rounded-[2rem] border-2 border-slate-700 font-black text-2xl text-slate-200 shadow-inner italic">
                 {analysis.pattern}
               </div>
             </div>
           </div>
 
-          {/* AI Trading Forecasts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            {/* BUY REPORT */}
+          {/* Reports Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+            {/* Buy Report */}
             <article className="bg-white rounded-[4rem] p-14 border border-slate-200 shadow-sm hover:shadow-2xl transition-all group overflow-hidden relative">
               <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
                 <ArrowUpRight className="w-56 h-56 text-red-600" />
               </div>
               <div className="flex items-center justify-between mb-12 pb-10 border-b border-slate-50 relative">
                 <h4 className="text-red-700 font-black text-4xl flex items-center gap-5 tracking-tighter">
-                  <ArrowUpRight className="w-12 h-12" /> 매수 리포트 (BUY)
+                  <ArrowUpRight className="w-12 h-12" /> 매수 리포트
                 </h4>
-                <div className="px-6 py-2 bg-red-100 text-red-600 rounded-full text-[12px] font-black uppercase tracking-widest">Buy Zone</div>
+                <div className="px-6 py-2.5 bg-red-100 text-red-600 rounded-full text-[12px] font-black uppercase tracking-widest">Buy Zone</div>
               </div>
               <div className="space-y-12 relative">
                 <div className="flex justify-between items-end">
                   <div>
-                    <p className="text-xs text-slate-400 font-black uppercase tracking-widest mb-3">예상 진입 가격</p>
-                    <p className="text-5xl font-black text-red-600 tracking-tighter">{Math.round(selectedStock.price * 1.002).toLocaleString()}원</p>
+                    <p className="text-xs text-slate-400 font-black uppercase tracking-[0.2em] mb-4">권장 진입가</p>
+                    <p className="text-6xl font-black text-red-600 tracking-tighter">{Math.round(selectedStock.price * 1.0015).toLocaleString()}원</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-slate-400 font-black uppercase tracking-widest mb-3">권장 진입 시점</p>
-                    <p className="text-2xl font-black text-slate-800 underline decoration-red-200 underline-offset-8 italic">2026-02-18 장 초반</p>
+                    <p className="text-xs text-slate-400 font-black uppercase tracking-[0.2em] mb-4">예상 시점</p>
+                    <p className="text-2xl font-black text-slate-800 underline decoration-red-200 underline-offset-[12px] italic">2026-02-18 Open</p>
                   </div>
                 </div>
                 <div className="p-10 bg-slate-50 rounded-[3rem] border border-slate-100 shadow-inner">
-                  <h5 className="text-[11px] font-black text-slate-400 mb-5 flex items-center gap-3 uppercase tracking-[0.3em]">
-                    <Info className="w-6 h-6 text-indigo-500" /> AI 상세 근거 리포트
+                  <h5 className="text-[12px] font-black text-slate-400 mb-5 flex items-center gap-4 uppercase tracking-[0.4em]">
+                    <Info className="w-6 h-6 text-indigo-500" /> 패턴 분석 근거
                   </h5>
                   <p className="text-lg text-slate-700 leading-relaxed font-black italic opacity-90">
                     "{analysis.desc}"
@@ -335,34 +405,34 @@ const App = () => {
               </div>
             </article>
 
-            {/* SELL REPORT */}
+            {/* Sell Report */}
             <article className="bg-white rounded-[4rem] p-14 border border-slate-200 shadow-sm hover:shadow-2xl transition-all group overflow-hidden relative">
               <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
                 <ArrowDownRight className="w-56 h-56 text-indigo-600" />
               </div>
               <div className="flex items-center justify-between mb-12 pb-10 border-b border-slate-50 relative">
                 <h4 className="text-indigo-700 font-black text-4xl flex items-center gap-5 tracking-tighter">
-                  <ArrowDownRight className="w-12 h-12" /> 매도 리포트 (SELL)
+                  <ArrowDownRight className="w-12 h-12" /> 매도 리포트
                 </h4>
-                <div className="px-6 py-2 bg-indigo-100 text-indigo-600 rounded-full text-[12px] font-black uppercase tracking-widest">Exit Zone</div>
+                <div className="px-6 py-2.5 bg-indigo-100 text-indigo-600 rounded-full text-[12px] font-black uppercase tracking-widest">Exit Zone</div>
               </div>
               <div className="space-y-12 relative">
                 <div className="flex justify-between items-end">
                   <div>
-                    <p className="text-xs text-slate-400 font-black uppercase tracking-widest mb-3">1차 목표 수익가</p>
+                    <p className="text-xs text-slate-400 font-black uppercase tracking-[0.2em] mb-4">1차 익절가</p>
                     <p className="text-6xl font-black text-indigo-600 tracking-tighter">{Math.round(selectedStock.price * 1.135).toLocaleString()}원</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-slate-400 font-black uppercase tracking-widest mb-3">리스크 관리</p>
-                    <p className="text-2xl font-black text-slate-800 underline decoration-indigo-200 underline-offset-8 italic">MA5 하향 이탈 시</p>
+                    <p className="text-xs text-slate-400 font-black uppercase tracking-[0.2em] mb-4">리스크 관리</p>
+                    <p className="text-2xl font-black text-slate-800 underline decoration-indigo-200 underline-offset-[12px] italic">MA5 이탈 시</p>
                   </div>
                 </div>
                 <div className="p-10 bg-slate-50 rounded-[3rem] border border-slate-100 shadow-inner">
                   <h5 className="text-[12px] font-black text-slate-400 mb-5 flex items-center gap-4 uppercase tracking-[0.4em]">
                     <AlertTriangle className="w-6 h-6 text-amber-500" /> 수익 보존 가이드
                   </h5>
-                  <p className="text-lg text-slate-700 leading-relaxed font-black opacity-90">
-                    상단 저항 영역에서 유성형 패턴이 나타나거나, 5일 이평선(검정색)을 종가 기준 하향 이탈할 경우 비중 축소 및 익절을 권장합니다.
+                  <p className="text-lg text-slate-700 leading-relaxed font-black">
+                    상단 저항선 부근에서 유성형 패턴이 발견되거나, 5일선(검정색)을 하향 이탈할 경우 비중 축소 및 수익 실현을 강력히 권장합니다.
                   </p>
                 </div>
               </div>
@@ -370,31 +440,34 @@ const App = () => {
           </div>
 
           <footer className="bg-slate-800 p-14 rounded-[4rem] text-xs text-slate-500 flex flex-col md:flex-row gap-16 border border-slate-700 shadow-inner">
-            <div className="flex-1 space-y-6">
-              <div className="flex items-center gap-4 text-amber-500 font-black uppercase tracking-[0.4em]">
-                <AlertTriangle className="w-8 h-8" /> 투자자 유의사항
+            <div className="flex-1 space-y-8">
+              <div className="flex items-center gap-5 text-amber-500 font-black uppercase tracking-[0.5em]">
+                <AlertTriangle className="w-8 h-8" /> 투자 유의사항
               </div>
-              <p className="leading-loose text-slate-400 font-medium">본 분석 데이터는 KRX 상장 정보를 기반으로 한 AI 캔들 패턴 알고리즘의 결과입니다. 과거의 패턴은 미래의 수익을 보장하지 않으며, 투자에 대한 모든 결정과 책임은 투자자 본인에게 있습니다.</p>
+              <p className="leading-loose text-slate-400 font-medium text-sm">본 분석은 KRX 시뮬레이션 데이터를 기반으로 한 AI 추정치입니다. 과거의 패턴이 미래의 수익을 보장하지 않으므로, 실제 투자는 기업 가치와 시장 상황을 종합적으로 고려하여 신중히 결정하시기 바랍니다.</p>
             </div>
-            <div className="flex-shrink-0 space-y-3 min-w-[220px]">
-              <p className="font-black text-slate-400 uppercase tracking-widest border-b border-slate-700 pb-2 mb-2">Master Database Status</p>
-              <p className="font-mono text-[10px] text-indigo-400">Last Sync: 2026-02-17 15:30 (Daily)</p>
-              <p className="font-mono text-[10px]">Data: FSC KRX Open API (Sim)</p>
+            <div className="flex-shrink-0 space-y-4 min-w-[240px]">
+              <p className="font-black text-slate-300 uppercase tracking-widest border-b border-slate-700 pb-3 mb-2">Master Database Status</p>
+              <div className="space-y-2 opacity-80">
+                <p className="font-mono text-[11px] text-indigo-400 flex justify-between">Sync Date: <span>2026-02-17</span></p>
+                <p className="font-mono text-[11px] flex justify-between text-slate-400">Time: <span>15:30 (Market Close)</span></p>
+                <p className="font-mono text-[11px] flex justify-between text-slate-400">Master List: <span>v3.5.0-R</span></p>
+              </div>
             </div>
           </footer>
         </div>
       </main>
 
-      {/* [Step 2] New Stock Search Modal (종목 검색 및 추가) */}
+      {/* New Stock Search Modal */}
       {isSearchModalOpen && (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-3xl z-[100] flex items-center justify-center p-8">
-          <div className="bg-white w-full max-w-4xl rounded-[4.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500">
+          <div className="bg-white w-full max-w-3xl rounded-[4.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500">
             <div className="p-14 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-6">
                 <div className="bg-indigo-600 p-5 rounded-[2rem] shadow-2xl shadow-indigo-200">
                   <Search className="w-10 h-10 text-white" />
                 </div>
-                <h2 className="font-black text-5xl text-slate-900 tracking-tighter">KRX 상장 종목 추가</h2>
+                <h2 className="font-black text-5xl text-slate-900 tracking-tighter">종목 추가 (KRX)</h2>
               </div>
               <button onClick={() => setIsSearchModalOpen(false)} className="p-5 hover:bg-slate-200 rounded-full transition-all text-slate-400">
                 <X className="w-12 h-12" />
@@ -413,25 +486,25 @@ const App = () => {
                 />
               </div>
               <div className="space-y-5 max-h-[500px] overflow-y-auto pr-8 custom-scrollbar">
-                {filteredMaster.length > 0 ? filteredMaster.map(stock => (
+                {filteredSearch.length > 0 ? filteredSearch.map(stock => (
                   <button
                     key={stock.code}
                     onClick={() => handleAddStock(stock)}
-                    className="w-full flex items-center justify-between p-12 bg-slate-50 hover:bg-indigo-600 hover:text-white rounded-[3.5rem] transition-all group shadow-sm hover:shadow-2xl hover:shadow-indigo-500/40 border border-transparent"
+                    className="w-full flex items-center justify-between p-10 bg-slate-50 hover:bg-indigo-600 hover:text-white rounded-[3rem] transition-all group shadow-sm hover:shadow-2xl hover:shadow-indigo-500/40 border border-transparent"
                   >
                     <div className="text-left">
-                      <p className="font-black text-4xl tracking-tight mb-1">{stock.name}</p>
+                      <p className="font-black text-3xl tracking-tight mb-1">{stock.name}</p>
                       <p className="text-sm font-bold opacity-60 uppercase tracking-[0.3em]">{stock.market} | {stock.code}</p>
                     </div>
-                    <div className="flex items-center gap-12">
-                      <div className="w-20 h-20 rounded-full border-4 border-indigo-100 flex items-center justify-center group-hover:border-white transition-colors">
-                        <Plus className="w-12 h-12 text-indigo-400 group-hover:text-white transition-transform group-hover:rotate-90" />
+                    <div className="flex items-center gap-10">
+                      <div className="w-16 h-16 rounded-full border-4 border-indigo-100 flex items-center justify-center group-hover:border-white transition-colors">
+                        <Plus className="w-10 h-10 text-indigo-400 group-hover:text-white transition-transform group-hover:rotate-90" />
                       </div>
                     </div>
                   </button>
                 )) : (
                   <div className="py-32 text-center text-slate-300 font-black italic text-3xl tracking-tighter">
-                    검색 결과가 없습니다. 종목명이나 코드를 다시 확인하세요.
+                    검색 결과가 없습니다.
                   </div>
                 )}
               </div>
@@ -440,7 +513,7 @@ const App = () => {
         </div>
       )}
 
-      {/* Global CSS Enhancements */}
+      {/* Global CSS */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
