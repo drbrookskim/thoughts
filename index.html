@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>내 관심 종목</title>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a;
+    --border: #2e3250; --accent: #4f8ef7; --accent2: #7c3aed;
+    --up: #26c77a; --down: #f44c6a; --text: #e8eaf6; --muted: #7b82a6; --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Apple SD Gothic Neo', 'Segoe UI', sans-serif; min-height: 100vh; padding: 24px 16px; }
+  .app { max-width: 760px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+  .logo { width: 40px; height: 40px; background: linear-gradient(135deg,var(--accent),var(--accent2)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  header h1 { font-size: 22px; font-weight: 700; }
+  header p { font-size: 13px; color: var(--muted); }
+  .search-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; }
+  .search-row { display: flex; gap: 10px; }
+  .search-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 15px; padding: 11px 14px; outline: none; transition: border-color .2s; }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--muted); }
+  .btn { background: linear-gradient(135deg,var(--accent),var(--accent2)); border: none; border-radius: 8px; color: #fff; font-size: 14px; font-weight: 600; padding: 11px 20px; cursor: pointer; transition: opacity .2s; white-space: nowrap; }
+  .btn:hover { opacity: .85; }
+  .search-hint { font-size: 12px; color: var(--muted); margin-top: 9px; }
+  .search-results { margin-top: 12px; display: none; }
+  .search-results.show { display: block; }
+  .result-item { display: flex; align-items: center; padding: 10px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; cursor: pointer; gap: 12px; transition: border-color .2s; }
+  .result-item:hover { border-color: var(--accent); }
+  .result-code { background: var(--border); border-radius: 5px; padding: 3px 8px; font-size: 12px; font-weight: 700; color: var(--accent); min-width: 60px; text-align: center; }
+  .result-name { font-size: 14px; font-weight: 500; }
+  .result-market { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .result-add-btn { background: var(--accent); border: none; border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600; padding: 5px 12px; cursor: pointer; }
+  .result-add-btn.added { background: var(--surface); color: var(--muted); cursor: default; }
+  .section-title { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .section-title span { background: var(--surface2); border-radius: 20px; padding: 2px 9px; font-size: 12px; color: var(--accent); }
+  .refresh-btn { margin-left: auto; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 7px; font-size: 12px; padding: 5px 12px; cursor: pointer; transition: border-color .2s; }
+  .refresh-btn:hover { border-color: var(--accent); }
+  .refresh-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .watchlist { display: flex; flex-direction: column; gap: 10px; }
+  .stock-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; display: flex; align-items: center; gap: 14px; position: relative; overflow: hidden; }
+  .stock-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--border); transition: background .3s; }
+  .stock-card.up::before { background: var(--up); }
+  .stock-card.down::before { background: var(--down); }
+  .stock-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: var(--accent); flex-shrink: 0; border: 1px solid var(--border); }
+  .stock-info { flex: 1; min-width: 0; }
+  .stock-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stock-meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+  .stock-code { font-size: 12px; color: var(--muted); }
+  .stock-market { font-size: 11px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; color: var(--muted); }
+  .stock-price-block { text-align: right; flex-shrink: 0; }
+  .stock-price { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stock-price.up { color: var(--up); } .stock-price.down { color: var(--down); } .stock-price.neutral { color: var(--text); }
+  .stock-change { font-size: 12px; margin-top: 2px; }
+  .stock-change.up { color: var(--up); } .stock-change.down { color: var(--down); } .stock-change.neutral { color: var(--muted); }
+  .stock-loading { font-size: 13px; color: var(--muted); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+  .delete-btn { background: none; border: 1px solid transparent; color: var(--muted); border-radius: 7px; font-size: 16px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: border-color .2s, color .2s; flex-shrink: 0; }
+  .delete-btn:hover { border-color: var(--down); color: var(--down); }
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-icon { font-size: 48px; margin-bottom: 16px; }
+  .empty h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+  .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: #2a2e45; border: 1px solid var(--border); border-radius: 10px; padding: 11px 20px; font-size: 14px; color: var(--text); transition: transform .3s ease; z-index: 100; white-space: nowrap; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .updated-time { font-size: 12px; color: var(--muted); margin-top: 14px; text-align: right; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">📈</div>
+    <div><h1>내 관심 종목</h1><p>한국 주식 관심 종목 관리</p></div>
+  </header>
+  <div class="search-section">
+    <div class="search-row">
+      <input type="text" class="search-input" id="searchInput" placeholder="종목명 또는 종목코드 검색 (예: 삼성전자, 005930)" autocomplete="off" />
+      <button class="btn" onclick="searchStocks()">검색</button>
+    </div>
+    <div class="search-hint">KOSPI·KOSDAQ 종목을 검색하여 관심 목록에 추가하세요</div>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+  <div class="section-title">관심 종목 <span id="countBadge">0</span>
+    <button class="refresh-btn" id="refreshBtn" onclick="refreshAllPrices()">🔄 시세 새로고침</button>
+  </div>
+  <div class="watchlist" id="watchlist"></div>
+  <div class="updated-time" id="updatedTime"></div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const STORAGE_KEY = 'watchlist-stocks';
+let watchlist = [];
+
+async function loadWatchlist() {
+  try { const r = await window.storage.get(STORAGE_KEY); if (r?.value) watchlist = JSON.parse(r.value); }
+  catch(e) { watchlist = []; }
+}
+async function saveWatchlist() {
+  try { await window.storage.set(STORAGE_KEY, JSON.stringify(watchlist)); } catch(e) {}
+}
+
+const STOCK_DB = [
+  {code:'005930',name:'삼성전자',market:'KOSPI'},{code:'000660',name:'SK하이닉스',market:'KOSPI'},
+  {code:'035420',name:'NAVER',market:'KOSPI'},{code:'035720',name:'카카오',market:'KOSPI'},
+  {code:'005380',name:'현대차',market:'KOSPI'},{code:'000270',name:'기아',market:'KOSPI'},
+  {code:'051910',name:'LG화학',market:'KOSPI'},{code:'006400',name:'삼성SDI',market:'KOSPI'},
+  {code:'207940',name:'삼성바이오로직스',market:'KOSPI'},{code:'068270',name:'셀트리온',market:'KOSPI'},
+  {code:'105560',name:'KB금융',market:'KOSPI'},{code:'055550',name:'신한지주',market:'KOSPI'},
+  {code:'086790',name:'하나금융지주',market:'KOSPI'},{code:'066570',name:'LG전자',market:'KOSPI'},
+  {code:'017670',name:'SK텔레콤',market:'KOSPI'},{code:'030200',name:'KT',market:'KOSPI'},
+  {code:'036570',name:'엔씨소프트',market:'KOSPI'},{code:'352820',name:'하이브',market:'KOSPI'},
+  {code:'003490',name:'대한항공',market:'KOSPI'},{code:'096770',name:'SK이노베이션',market:'KOSPI'},
+  {code:'011200',name:'HMM',market:'KOSPI'},{code:'009150',name:'삼성전기',market:'KOSPI'},
+  {code:'033780',name:'KT&G',market:'KOSPI'},{code:'015760',name:'한국전력',market:'KOSPI'},
+  {code:'316140',name:'우리금융지주',market:'KOSPI'},{code:'000100',name:'유한양행',market:'KOSPI'},
+  {code:'128940',name:'한미약품',market:'KOSPI'},{code:'373220',name:'LG에너지솔루션',market:'KOSPI'},
+  {code:'028260',name:'삼성물산',market:'KOSPI'},{code:'003550',name:'LG',market:'KOSPI'},
+  {code:'032830',name:'삼성생명',market:'KOSPI'},{code:'000810',name:'삼성화재',market:'KOSPI'},
+  {code:'247540',name:'에코프로비엠',market:'KOSDAQ'},{code:'086520',name:'에코프로',market:'KOSDAQ'},
+  {code:'196170',name:'알테오젠',market:'KOSDAQ'},{code:'263750',name:'펄어비스',market:'KOSDAQ'},
+  {code:'293490',name:'카카오게임즈',market:'KOSDAQ'},{code:'112040',name:'위메이드',market:'KOSDAQ'},
+  {code:'041510',name:'에스엠',market:'KOSDAQ'},{code:'035900',name:'JYP Ent.',market:'KOSDAQ'},
+  {code:'122870',name:'와이지엔터테인먼트',market:'KOSDAQ'},{code:'214150',name:'클래시스',market:'KOSDAQ'},
+  {code:'450080',name:'에코프로머티리얼즈',market:'KOSDAQ'},{code:'091990',name:'셀트리온헬스케어',market:'KOSDAQ'},
+  {code:'251270',name:'넷마블',market:'KOSPI'},{code:'024110',name:'기업은행',market:'KOSPI'},
+  {code:'010950',name:'S-Oil',market:'KOSPI'},{code:'012330',name:'현대모비스',market:'KOSPI'},
+];
+
+function searchStocks() {
+  const query = document.getElementById('searchInput').value.trim();
+  if (!query) { showToast('검색어를 입력해 주세요'); return; }
+  const lower = query.toLowerCase().replace(/\s/g,'');
+  const results = STOCK_DB.filter(s => s.name.replace(/\s/g,'').toLowerCase().includes(lower) || s.code.includes(query)).slice(0, 8);
+  const container = document.getElementById('searchResults');
+  container.classList.add('show');
+  if (!results.length) { container.innerHTML = `<div style="text-align:center;padding:16px;color:var(--muted);font-size:14px;">검색 결과가 없습니다.</div>`; return; }
+  const inWl = new Set(watchlist.map(s => s.code));
+  container.innerHTML = results.map(s => {
+    const added = inWl.has(s.code);
+    return `<div class="result-item" onclick="addStock('${s.code}','${s.name}','${s.market}')">
+      <div class="result-code">${s.code}</div>
+      <div class="result-name">${s.name}</div>
+      <div class="result-market">${s.market}</div>
+      <button class="result-add-btn ${added?'added':''}" onclick="event.stopPropagation();addStock('${s.code}','${s.name}','${s.market}')">${added?'추가됨':'+ 추가'}</button>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key==='Enter') searchStocks(); });
+
+function addStock(code, name, market) {
+  if (watchlist.find(s => s.code===code)) { showToast(`${name}은(는) 이미 추가됨`); return; }
+  watchlist.push({code, name, market, price:null, change:null, changeRate:null});
+  saveWatchlist(); renderWatchlist(); fetchPrice(code);
+  showToast(`✅ ${name} 추가됨`);
+  const q = document.getElementById('searchInput').value.trim();
+  if (q) searchStocks();
+}
+
+function removeStock(code) {
+  const s = watchlist.find(x => x.code===code);
+  watchlist = watchlist.filter(x => x.code!==code);
+  saveWatchlist(); renderWatchlist();
+  if (s) showToast(`🗑 ${s.name} 삭제됨`);
+}
+
+async function fetchPrice(code) {
+  const card = document.getElementById(`card-${code}`);
+  if (!card) return;
+  card.querySelector('.stock-price-block').innerHTML = `<div class="stock-loading">조회 중...</div>`;
+  try {
+    const stock = watchlist.find(s => s.code===code);
+    if (!stock) return;
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 1000,
+        tools: [{type:"web_search_20250305",name:"web_search"}],
+        messages: [{role:"user",content:`한국 주식 "${stock.name}"(${stock.code}) 현재 주가를 검색해줘. 반드시 JSON만 응답: {"price":숫자,"change":숫자,"changeRate":숫자} 못찾으면 {"price":null,"change":null,"changeRate":null}`}]
+      })
+    });
+    const data = await response.json();
+    const text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+    const clean = text.replace(/```json|```/g,'').trim();
+    let parsed;
+    try { parsed = JSON.parse(clean); } catch(e) { const m=clean.match(/\{[^{}]+\}/); if(m) parsed=JSON.parse(m[0]); }
+    if (parsed?.price != null) {
+      const idx = watchlist.findIndex(s=>s.code===code);
+      if (idx!==-1) { watchlist[idx]={...watchlist[idx],...parsed}; saveWatchlist(); }
+      updateCard(code, parsed.price, parsed.change, parsed.changeRate);
+    } else {
+      card.querySelector('.stock-price-block').innerHTML = `<div style="font-size:13px;color:var(--muted)">시세 없음</div>`;
+    }
+  } catch(e) {
+    card.querySelector('.stock-price-block').innerHTML = `<div style="font-size:13px;color:var(--down)">오류</div>`;
+  }
+}
+
+function updateCard(code, price, change, changeRate) {
+  const card = document.getElementById(`card-${code}`);
+  if (!card) return;
+  const dir = change>0?'up':change<0?'down':'neutral';
+  const arrow = change>0?'▲':change<0?'▼':'─';
+  card.className = `stock-card ${dir}`;
+  card.querySelector('.stock-price-block').innerHTML = `
+    <div class="stock-price ${dir}">${price.toLocaleString()}원</div>
+    <div class="stock-change ${dir}">${arrow} ${Math.abs(change).toLocaleString()} (${Math.abs(changeRate).toFixed(2)}%)</div>`;
+  document.getElementById('updatedTime').textContent = `마지막 조회: ${new Date().toLocaleTimeString('ko-KR')}`;
+}
+
+async function refreshAllPrices() {
+  if (!watchlist.length) { showToast('관심 종목이 없습니다'); return; }
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled=true; btn.textContent='조회 중...';
+  for (const s of watchlist) { await fetchPrice(s.code); await new Promise(r=>setTimeout(r,500)); }
+  btn.disabled=false; btn.textContent='🔄 시세 새로고침';
+  showToast('✅ 시세 업데이트 완료');
+}
+
+function renderWatchlist() {
+  const c = document.getElementById('watchlist');
+  document.getElementById('countBadge').textContent = watchlist.length;
+  if (!watchlist.length) {
+    c.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div><h3>관심 종목이 없습니다</h3><p>위 검색창에서 종목을 추가해 보세요</p></div>`;
+    return;
+  }
+  c.innerHTML = watchlist.map(s => {
+    const dir = s.change>0?'up':s.change<0?'down':'neutral';
+    const arrow = s.change>0?'▲':s.change<0?'▼':'─';
+    const priceHtml = s.price!=null
+      ? `<div class="stock-price ${dir}">${s.price.toLocaleString()}원</div><div class="stock-change ${dir}">${arrow} ${Math.abs(s.change||0).toLocaleString()} (${Math.abs(s.changeRate||0).toFixed(2)}%)</div>`
+      : `<div class="stock-loading">조회 전</div>`;
+    return `<div class="stock-card ${dir}" id="card-${s.code}">
+      <div class="stock-icon">${s.name.slice(0,2)}</div>
+      <div class="stock-info"><div class="stock-name">${s.name}</div>
+        <div class="stock-meta"><span class="stock-code">${s.code}</span><span class="stock-market">${s.market}</span></div>
+      </div>
+      <div class="stock-price-block">${priceHtml}</div>
+      <button class="delete-btn" onclick="removeStock('${s.code}')" title="삭제">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+(async () => {
+  await loadWatchlist(); renderWatchlist();
+  if (watchlist.length) for (const s of watchlist) { await fetchPrice(s.code); await new Promise(r=>setTimeout(r,400)); }
+})();
+</script>
+</body>
+</html>
