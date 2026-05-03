@@ -1,7 +1,0 @@
-flask
-yfinance
-pykrx
-pandas
-pandas_ta
-requests
-gunicorn
