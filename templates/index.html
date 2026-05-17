@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dr. Brooks Thoughts Scraper</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Vis.js for Obsidian Knowledge Graph style network map -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
+    <!-- Marked.js for fast client-side markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="/static/style.css">
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('drbrooks-theme') || 'dark';
+            if (savedTheme === 'light') {
+                document.documentElement.classList.add('theme-light');
+            } else if (savedTheme === 'system') {
+                const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (!systemPrefersDark) {
+                    document.documentElement.classList.add('theme-light');
+                }
+            }
+        })();
+    </script>
+</head>
+<body>
+    <!-- Constellation backplane canvas -->
+    <canvas id="bg-particle-canvas"></canvas>
+
+    <!-- Glassmorphic Neon Sync Notification Banner -->
+    <div id="sync-notification-banner" class="sync-banner hidden">
+        <div class="banner-content">
+            <span class="banner-bell"><i class="fa-solid fa-bell fa-bounce text-neon-blue"></i></span>
+            <span class="banner-text">📢 작가님의 새로운 글이 브런치에 올라왔습니다! (브런치: <strong id="notify-online-count">0</strong>개 / 로컬: <strong id="notify-local-count">0</strong>개)</span>
+            <button class="btn btn-banner-sync" id="btn-banner-sync"><i class="fa-solid fa-arrows-rotate"></i> 지금 동기화 수집</button>
+            <button class="btn-banner-close" id="btn-banner-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    </div>
+
+    <div class="app-container">
+        
+        <!-- ================= SIDEBAR ================= -->
+        <aside class="sidebar">
+            <!-- App Header -->
+            <div class="brand">
+                <div class="logo-icon"><i class="fa-solid fa-feather-pointed"></i></div>
+                <div class="brand-text">
+                    <h1>Dr. Brooks Thoughts</h1>
+                </div>
+            </div>
+
+            <!-- Stats Overview -->
+            <div class="stats-card">
+                <div class="stat-item">
+                    <span class="stat-value" id="stat-count">0</span>
+                    <span class="stat-label">수집된 기사</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                    <span class="stat-value" id="stat-latest-date">N/A</span>
+                    <span class="stat-label">최근 작성일</span>
+                </div>
+            </div>
+
+            <!-- Scraper Control Panel -->
+            <div class="control-panel">
+                <div class="panel-header" id="toggle-scraper-btn">
+                    <h2><i class="fa-solid fa-gears"></i> 신규 크롤러 구동</h2>
+                    <i class="fa-solid fa-chevron-down toggle-icon"></i>
+                </div>
+                <div class="panel-body hidden" id="scraper-form-container">
+                    <div class="input-group">
+                        <label for="input-author">작가 ID</label>
+                        <div class="input-wrapper">
+                            <span class="input-prefix">@</span>
+                            <input type="text" id="input-author" value="drbrooks" placeholder="작가 ID">
+                        </div>
+                    </div>
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="input-start-date">시작 날짜</label>
+                            <input type="date" id="input-start-date" value="2025-12-14">
+                        </div>
+                        <div class="input-group">
+                            <label for="input-end-date">종료 날짜</label>
+                            <input type="date" id="input-end-date">
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="input-start-id">시작 글 ID</label>
+                        <input type="number" id="input-start-id" value="164" min="1">
+                    </div>
+                    <button class="btn btn-primary" id="btn-start-scrape">
+                        <i class="fa-solid fa-circle-play"></i> 크롤링 시작
+                    </button>
+                </div>
+            </div>
+
+            <!-- Live Scraping Monitor (Log Console) -->
+            <div class="monitor-panel hidden" id="monitor-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-terminal"></i> 실시간 수집 모니터</h2>
+                    <span class="status-badge pulse" id="scraper-status-badge">대기 중</span>
+                </div>
+                <div class="console-wrapper">
+                    <pre class="console" id="console-logs">준비 완료...</pre>
+                </div>
+                <div class="monitor-footer">
+                    <span class="scraped-progress">수집 완료: <strong id="monitor-progress-count">0</strong>개</span>
+                </div>
+            </div>
+
+            <!-- Articles List -->
+            <div class="articles-list-container">
+                <div class="list-header">
+                    <h2><i class="fa-solid fa-list-ul"></i> 수집된 글 목록</h2>
+                    <div class="search-box">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="search-input" placeholder="제목 또는 날짜 검색...">
+                    </div>
+                </div>
+                <div class="articles-list" id="articles-list">
+                    <!-- Loading placeholder -->
+                    <div class="list-placeholder">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                        <p>목록 불러오는 중...</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ================= ARTICLE VIEWER ================= -->
+        <main class="viewer-container">
+            <!-- Navigation Tabs -->
+            <div class="viewer-tabs">
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <button class="mobile-sidebar-toggle" id="mobile-sidebar-toggle" title="글목록 메뉴 열기">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <div class="tab-group">
+                        <button class="tab-btn active" id="tab-reader-btn"><i class="fa-solid fa-book-open"></i> 글보기</button>
+                        <button class="tab-btn" id="tab-graph-btn"><i class="fa-solid fa-circle-nodes"></i> 지식 그래프</button>
+                    </div>
+                </div>
+                
+                <!-- 🌓 Premium Theme Switcher Segment -->
+                <div class="theme-switcher">
+                    <button class="theme-btn" data-theme="light" title="라이트 모드">
+                        <i class="fa-solid fa-sun"></i>
+                    </button>
+                    <button class="theme-btn active" data-theme="dark" title="다크 모드">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+                    <button class="theme-btn" data-theme="system" title="기기 설정">
+                        <i class="fa-solid fa-desktop"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 1. Obsidian style Knowledge Graph View -->
+            <div class="graph-view hidden" id="graph-view-container">
+                <div id="graph-canvas"></div>
+                <div class="graph-legend">
+                    <span class="legend-item"><span class="dot philosophy"></span>철학 & 사색</span>
+                    <span class="legend-item"><span class="dot tech"></span>AI & 웹기술</span>
+                    <span class="legend-item"><span class="dot business"></span>기획 & 비즈니스</span>
+                    <span class="legend-item"><span class="dot leadership"></span>소통 & 리더십</span>
+                    <span class="legend-item"><span class="dot society"></span>인간 & 사회</span>
+                </div>
+            </div>
+
+            <!-- Welcome View (Default when reader tab is active but no article chosen) -->
+            <div class="welcome-view" id="welcome-view">
+                <div class="welcome-content">
+                    <div class="welcome-illustration">
+                        <i class="fa-solid fa-book-open-reader"></i>
+                    </div>
+                    <h2>Dr. Brooks Thoughts 대시보드</h2>
+                    <p>좌측 목록에서 기사를 선택하시거나 그래프 상의 노드를 클릭하시면<br>우아한 가독성의 프리미엄 리더 뷰어로 즉시 연결됩니다.</p>
+                    <div class="welcome-stats">
+                        <span class="badge"><i class="fa-solid fa-clock-rotate-left"></i> 전체 기사 연동</span>
+                        <span class="badge"><i class="fa-solid fa-wand-magic-sparkles"></i> Astro Hydration 클리너 적용</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Article View -->
+            <article class="article-view hidden" id="article-view">
+                <!-- Viewer Header -->
+                <header class="viewer-header">
+                    <div class="header-meta">
+                        <span class="article-date-badge" id="view-date"><i class="fa-regular fa-calendar"></i> 2025-12-14</span>
+                        <h1 id="view-title">제목이 여기에 표시됩니다.</h1>
+                        <div class="header-links">
+                            <span class="file-info" id="view-file-info"><i class="fa-regular fa-file-code"></i> file.md (12KB)</span>
+                            <a href="#" target="_blank" class="btn btn-secondary" id="view-url-btn">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i> 브런치 원문 가기
+                            </a>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Article Body Content -->
+                <section class="viewer-content markdown-body" id="view-content">
+                    <!-- Rendered markdown html will be injected here -->
+                </section>
+            </article>
+        </main>
+        
+    </div>
+
+    <!-- JavaScript logic -->
+    <script src="/static/app.js"></script>
+
+    <!-- 🌌 Constellation Particle Network Background Script -->
+    <script>
+        (function() {
+            const canvas = document.getElementById('bg-particle-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            let mouse = {
+                x: null,
+                y: null,
+                radius: 180,
+                active: false
+            };
+
+            const CONFIG = {
+                particleCountRatio: 0.00015, // Enhanced constellation density for vibrant backdrop
+                maxParticlesLimit: 180,
+                baseSpeed: 0.25, // Drifts ultra slowly like cosmic dust
+                connectionDistance: 115,
+                particleSizeMin: 1.0,
+                particleSizeMax: 3.0,
+                pushForceStrength: 0.05
+            };
+
+            let particlesArray = [];
+
+            function setCanvasDimensions() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                initializeParticles();
+            }
+
+            class Particle {
+                constructor(x, y, vx, vy, size) {
+                    this.x = x;
+                    this.y = y;
+                    this.vx = vx;
+                    this.vy = vy;
+                    this.origVx = vx;
+                    this.origVy = vy;
+                    this.size = size;
+                    
+                    // Faint Constellation Twinkle Config (optimized for background contrast)
+                    this.twinklePhase = Math.random() * Math.PI * 2;
+                    this.twinkleSpeed = Math.random() * 0.025 + 0.008; // Organic slower breath
+                    this.baseOpacity = Math.random() * 0.35 + 0.18; // Soft midnight baseline
+                    this.opacity = this.baseOpacity;
+                }
+
+                draw() {
+                    const isLight = document.body.classList.contains('theme-light');
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
+                    ctx.fillStyle = isLight ? `rgba(15, 23, 42, ${this.opacity * 0.85})` : `rgba(255, 255, 255, ${this.opacity * 1.1})`;
+                    
+                    // Faint Sparkle Bloom for the dashboard backdrop
+                    if (this.opacity > 0.4) {
+                        ctx.shadowColor = isLight ? 'rgba(14, 165, 233, 0.65)' : 'rgba(0, 242, 254, 0.8)';
+                        ctx.shadowBlur = this.size * 3.0;
+                    } else {
+                        ctx.shadowColor = 'transparent';
+                        ctx.shadowBlur = 0;
+                    }
+                    ctx.fill();
+                }
+
+                update() {
+                    if (this.x < 0 || this.x > canvas.width) this.vx = -this.vx;
+                    if (this.y < 0 || this.y > canvas.height) this.vy = -this.vy;
+
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    // Organic Twinkle Oscillation
+                    this.twinklePhase += this.twinkleSpeed;
+                    this.opacity = this.baseOpacity + Math.sin(this.twinklePhase) * 0.18;
+                    // Clamp to prevent visual distraction
+                    this.opacity = Math.max(0.08, Math.min(0.75, this.opacity));
+
+                    this.vx = this.vx * 0.98 + this.origVx * 0.02;
+                    this.vy = this.vy * 0.98 + this.origVy * 0.02;
+
+                    if (mouse.x !== null && mouse.y !== null) {
+                        let dx = this.x - mouse.x;
+                        let dy = this.y - mouse.y;
+                        let distance = Math.hypot(dx, dy);
+
+                        if (distance < mouse.radius) {
+                            let force = (mouse.radius - distance) / mouse.radius;
+                            let angle = Math.atan2(dy, dx);
+                            
+                            let pushX = Math.cos(angle) * force * CONFIG.pushForceStrength * 15;
+                            let pushY = Math.sin(angle) * force * CONFIG.pushForceStrength * 15;
+
+                            this.vx += pushX;
+                            this.vy += pushY;
+                        }
+                    }
+                }
+            }
+
+            function initializeParticles() {
+                particlesArray = [];
+                let totalArea = canvas.width * canvas.height;
+                let particlesNum = Math.min(Math.floor(totalArea * CONFIG.particleCountRatio), CONFIG.maxParticlesLimit);
+
+                for (let i = 0; i < particlesNum; i++) {
+                    let size = Math.random() * (CONFIG.particleSizeMax - CONFIG.particleSizeMin) + CONFIG.particleSizeMin;
+                    let x = Math.random() * canvas.width;
+                    let y = Math.random() * canvas.height;
+                    
+                    let angle = Math.random() * Math.PI * 2;
+                    let speed = Math.random() * CONFIG.baseSpeed + 0.05;
+                    let vx = Math.cos(angle) * speed;
+                    let vy = Math.sin(angle) * speed;
+
+                    particlesArray.push(new Particle(x, y, vx, vy, size));
+                }
+            }
+
+            function connectParticles() {
+                for (let i = 0; i < particlesArray.length; i++) {
+                    for (let j = i + 1; j < particlesArray.length; j++) {
+                        let p1 = particlesArray[i];
+                        let p2 = particlesArray[j];
+
+                        let dx = p1.x - p2.x;
+                        let dy = p1.y - p2.y;
+                        let distance = Math.hypot(dx, dy);
+
+                        if (distance < CONFIG.connectionDistance) {
+                            let opacity = (1 - (distance / CONFIG.connectionDistance)) * 0.16;
+
+                            if (mouse.x !== null && mouse.y !== null) {
+                                let midX = (p1.x + p2.x) / 2;
+                                let midY = (p1.y + p2.y) / 2;
+                                let mouseDist = Math.hypot(midX - mouse.x, midY - mouse.y);
+
+                                if (mouseDist < mouse.radius) {
+                                    let boost = (1 - (mouseDist / mouse.radius)) * 0.3;
+                                    opacity += boost;
+                                }
+                            }
+
+                            const isLight = document.body.classList.contains('theme-light');
+                            ctx.beginPath();
+                            ctx.moveTo(p1.x, p1.y);
+                            ctx.lineTo(p2.x, p2.y);
+                            ctx.strokeStyle = isLight ? `rgba(15, 23, 42, ${opacity * 0.65})` : `rgba(203, 213, 225, ${opacity * 1.1})`;
+                            ctx.lineWidth = 0.65;
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                connectParticles();
+
+                for (let i = 0; i < particlesArray.length; i++) {
+                    particlesArray[i].update();
+                    particlesArray[i].draw();
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            window.addEventListener('resize', setCanvasDimensions);
+            window.addEventListener('mousemove', (e) => {
+                mouse.x = e.clientX;
+                mouse.y = e.clientY;
+                mouse.active = true;
+            });
+            window.addEventListener('mouseout', () => {
+                mouse.x = null;
+                mouse.y = null;
+                mouse.active = false;
+            });
+
+            setCanvasDimensions();
+            animate();
+        })();
+    </script>
+</body>
+</html>
