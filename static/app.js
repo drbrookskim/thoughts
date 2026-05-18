@@ -423,33 +423,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const artBgHover = isLight ? '#94a3b8' : '#8a99ad';
         const edgeBase = isLight ? '#475569' : '#334155';
 
-        // 1. Central Category Nodes Definition
+        // 1. Curated 7-Category Metadata Definition
         const categories = {
-            "cat_philosophy": { label: "🧠 Philosophy", color: "#ff6b8b", lineColor: "#803545", shadow: "rgba(255, 107, 139, 0.2)" },
-            "cat_tech": { label: "💻 AI & Tech", color: "#00f2fe", lineColor: "#00797f", shadow: "rgba(0, 242, 254, 0.2)" },
-            "cat_business": { label: "💼 Planning", color: "#fbd043", lineColor: "#7d6821", shadow: "rgba(251, 208, 67, 0.2)" },
-            "cat_leadership": { label: "👥 Leadership", color: "#a18cd1", lineColor: "#504668", shadow: "rgba(161, 140, 209, 0.2)" },
-            "cat_society": { label: "🌍 Society", color: "#4facfe", lineColor: "#27567f", shadow: "rgba(79, 172, 254, 0.2)" }
+            "기획론": { label: "기획론", color: "#a18cd1", lineColor: "#504668", shadow: "rgba(161, 140, 209, 0.2)" },
+            "상품기획": { label: "상품기획", color: "#fbd043", lineColor: "#7d6821", shadow: "rgba(251, 208, 67, 0.2)" },
+            "AI와 기술": { label: "AI와 기술", color: "#00f2fe", lineColor: "#00797f", shadow: "rgba(0, 242, 254, 0.2)" },
+            "인간과 심리": { label: "인간과 심리", color: "#ff6b8b", lineColor: "#803545", shadow: "rgba(255, 107, 139, 0.2)" },
+            "사고와 언어": { label: "사고와 언어", color: "#ff9f43", lineColor: "#805022", shadow: "rgba(255, 159, 67, 0.2)" },
+            "관계와 사회": { label: "관계와 사회", color: "#4facfe", lineColor: "#27567f", shadow: "rgba(79, 172, 254, 0.2)" },
+            "경제와 가치": { label: "경제와 가치", color: "#2ecc71", lineColor: "#176638", shadow: "rgba(46, 204, 113, 0.2)" }
         };
 
         const nodesArray = [];
         const edgesArray = [];
-
-        // Category Classification Algorithm
-        function getCategory(title) {
-            const lower = title.toLowerCase();
-            if (lower.includes("상품기획") || lower.includes("기획") || lower.includes("아이디어") || lower.includes("가치") || lower.includes("비즈니스") || lower.includes("경쟁") || lower.includes("쇼핑카트")) {
-                return "cat_business";
-            } else if (lower.includes("ai") || lower.includes("웹") || lower.includes("스마트폰") || lower.includes("기술") || lower.includes("프로그래머") || lower.includes("페이지랭크") || lower.includes("토큰") || lower.includes("인공지능")) {
-                return "cat_tech";
-            } else if (lower.includes("철학") || lower.includes("순수이성") || lower.includes("게티어") || lower.includes("인식") || lower.includes("사고") || lower.includes("본질") || lower.includes("감정") || lower.includes("외로움") || lower.includes("상상력") || lower.includes("자아")) {
-                return "cat_philosophy";
-            } else if (lower.includes("리더") || lower.includes("소통") || lower.includes("무례") || lower.includes("권위") || lower.includes("말실수") || lower.includes("조언") || lower.includes("태도") || lower.includes("리더십")) {
-                return "cat_leadership";
-            } else {
-                return "cat_society";
-            }
-        }
 
         // Resolve focused article details if set
         let focusedArticle = null;
@@ -457,38 +443,25 @@ document.addEventListener('DOMContentLoaded', () => {
             focusedArticle = items.find(a => a.id === focusedArticleId);
             if (!focusedArticle) focusedArticleId = null; // Reset if invalid
         }
-        const focusedCatId = focusedArticle ? getCategory(focusedArticle.title) : null;
+        const focusedCatId = focusedArticle ? (focusedArticle.category || "기획론") : null;
         const focusedCatMeta = focusedCatId ? categories[focusedCatId] : null;
 
-        // Add Category Nodes
-        Object.entries(categories).forEach(([id, meta]) => {
-            const isFocusedCat = (focusedCatId === id);
-            nodesArray.push({
-                id: id,
-                label: meta.label,
-                color: {
-                    background: catBg,
-                    border: meta.color,
-                    highlight: {
-                        background: catBgHighlight,
-                        border: meta.color
-                    }
-                },
-                // Emphasize the focused category hub, shrink others slightly for focus clarity
-                size: focusedArticleId !== null ? (isFocusedCat ? 15 : 9) : 12,
-                font: { 
-                    size: focusedArticleId !== null ? (isFocusedCat ? 15 : 12) : 16, 
-                    bold: true, 
-                    color: catFontColor 
-                },
-                shadow: { enabled: true, color: meta.shadow, size: 15 }
-            });
+        // Group articles by their category to establish local associative links (Obsidian Clusters)
+        const articlesByCategory = {};
+        Object.keys(categories).forEach(cat => {
+            articlesByCategory[cat] = [];
+        });
+        items.forEach(article => {
+            const cat = article.category || "기획론";
+            if (articlesByCategory[cat]) {
+                articlesByCategory[cat].push(article);
+            }
         });
 
-        // Add Article Nodes
+        // Add Article Nodes (No Category Hub Nodes to reflect pure Obsidian structure!)
         items.forEach(article => {
-            const catId = getCategory(article.title);
-            const catMeta = categories[catId];
+            const catId = article.category || "기획론";
+            const catMeta = categories[catId] || categories["기획론"];
             const isFocused = (article.id === focusedArticleId);
             const isSameCat = (catId === focusedCatId);
 
@@ -497,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 nodesArray.push({
                     id: article.id,
                     label: article.title, // Full title without truncation for absolute focus
-                    title: `[현재 메인 글]\n${article.title}\n(작성일: ${article.date})`,
+                    title: `[현재 메인 글]\n${article.title}\n(분야: ${catId} | 작성일: ${article.date})`,
                     color: {
                         background: catMeta.color, // Neon glow core matching the category
                         border: isLight ? '#0f172a' : '#ffffff',
@@ -510,9 +483,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             border: isLight ? '#0f172a' : '#ffffff'
                         }
                     },
-                    size: 20, // Large physical sphere
+                    size: 16, // Large physical sphere
                     mass: 3.5, // High mass pulls other nodes visually and structurally
-                    font: { size: 15, bold: true, color: catFontColor, face: 'Outfit' },
+                    font: { size: 14, bold: true, color: catFontColor, face: 'Outfit' },
                     shadow: { enabled: true, color: catMeta.shadow, size: 25 }
                 });
             } else {
@@ -522,30 +495,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     nodeLabel = nodeLabel.substring(0, 11) + "...";
                 }
 
-                let nodeSize = 5.5;
-                let nodeFontSize = 12;
+                let nodeSize = 5.0;
+                let nodeFontSize = 11;
                 let nodeFontColor = artFontColor;
 
                 // Focus styling optimization
                 if (focusedArticleId !== null) {
                     if (isSameCat) {
                         nodeSize = 7.0; // Sibling articles clustered beautifully
-                        nodeFontSize = 13;
+                        nodeFontSize = 12;
                         nodeFontColor = catMeta.color; // Highlight color
                     } else {
-                        nodeSize = 4.0; // Shrink unrelated articles
-                        nodeFontSize = 10;
-                        nodeFontColor = isLight ? '#94a3b8' : '#475569'; // Fade unrelated
+                        nodeSize = 3.5; // Shrink unrelated articles
+                        nodeFontSize = 9;
+                        nodeFontColor = isLight ? '#cbd5e1' : '#334155'; // Fade unrelated
                     }
                 }
 
                 nodesArray.push({
                     id: article.id,
                     label: nodeLabel,
-                    title: `${article.title}\n(작성일: ${article.date})`,
+                    title: `${article.title}\n(분야: ${catId} | 작성일: ${article.date})`,
                     color: {
                         background: artBg,
-                        border: '#64748b',
+                        border: isLight ? '#cbd5e1' : '#475569',
                         highlight: {
                             background: artBgHover,
                             border: catMeta.color
@@ -559,62 +532,144 @@ document.addEventListener('DOMContentLoaded', () => {
                     font: { size: nodeFontSize, color: nodeFontColor, face: 'Outfit' }
                 });
             }
+        });
 
-            // Connection Edges Definition
-            if (focusedArticleId !== null) {
-                if (isFocused) {
-                    // Central hero connects directly to ALL 5 Category hubs (satellites)
-                    Object.keys(categories).forEach(cId => {
-                        const cMeta = categories[cId];
-                        edgesArray.push({
-                            from: article.id,
-                            to: cId,
-                            length: 160, // Keep hubs nicely spaced
-                            width: 1.5,
-                            color: {
-                                color: isLight ? '#cbd5e1' : '#222c3e',
-                                highlight: cMeta.color,
-                                hover: cMeta.color
-                            }
-                        });
-                    });
-                } else if (isSameCat) {
-                    // peer category articles orbit and connect directly to the center focused article!
+        // Add Organic Intra-Category Connections (Obsidian Cluster Architecture)
+        Object.entries(articlesByCategory).forEach(([catId, catArticles]) => {
+            const catMeta = categories[catId];
+            
+            // Sort articles chronologically/numerically to form a clean logical spine
+            catArticles.sort((a, b) => a.id - b.id);
+            
+            catArticles.forEach((article, idx) => {
+                const isFocused = (article.id === focusedArticleId);
+                const isSameCat = (catId === focusedCatId);
+                
+                // 1. Connect to adjacent article (Spine Chain)
+                if (idx > 0) {
+                    const prev = catArticles[idx - 1];
+                    let edgeColor = isLight ? '#e2e8f0' : '#1e293b';
+                    let edgeWidth = 0.65;
+                    
+                    if (focusedArticleId !== null) {
+                        if (isSameCat) {
+                            edgeColor = catMeta.lineColor;
+                            edgeWidth = 1.0;
+                        } else {
+                            edgeColor = isLight ? '#f1f5f9' : '#111827';
+                            edgeWidth = 0.35;
+                        }
+                    }
+                    
                     edgesArray.push({
                         from: article.id,
-                        to: focusedArticleId,
-                        length: 85, // Cluster related reads tightly
-                        width: 1.25,
+                        to: prev.id,
+                        length: 80,
+                        width: edgeWidth,
                         color: {
-                            color: catMeta.lineColor,
+                            color: edgeColor,
                             highlight: catMeta.color,
                             hover: catMeta.color
                         }
                     });
-                } else {
-                    // Unrelated category articles connect back to their normal category hubs
+                }
+                
+                // 2. Connect to index-3 sibling (Short Loop / Branching)
+                if (idx > 2 && idx % 3 === 0) {
+                    const sibling = catArticles[idx - 3];
+                    let edgeColor = isLight ? '#cbd5e1' : '#1e293b';
+                    let edgeWidth = 0.5;
+                    
+                    if (focusedArticleId !== null) {
+                        if (isSameCat) {
+                            edgeColor = catMeta.lineColor;
+                            edgeWidth = 0.85;
+                        } else {
+                            edgeColor = isLight ? '#f1f5f9' : '#111827';
+                            edgeWidth = 0.25;
+                        }
+                    }
+                    
                     edgesArray.push({
                         from: article.id,
-                        to: catId,
+                        to: sibling.id,
+                        length: 120,
+                        width: edgeWidth,
                         color: {
-                            color: edgeBase,
-                            highlight: catMeta.lineColor,
-                            hover: catMeta.lineColor
+                            color: edgeColor,
+                            highlight: catMeta.color,
+                            hover: catMeta.color
                         }
                     });
                 }
-            } else {
-                // Normal category hub mode
-                edgesArray.push({
-                    from: article.id,
-                    to: catId,
-                    color: {
-                        color: edgeBase,
-                        highlight: catMeta.lineColor,
-                        hover: catMeta.lineColor
+                
+                // 3. Connect to index-7 sibling (Longer structural cross-linking)
+                if (idx > 6 && idx % 7 === 0) {
+                    const sibling = catArticles[idx - 7];
+                    let edgeColor = isLight ? '#cbd5e1' : '#1e293b';
+                    let edgeWidth = 0.5;
+                    
+                    if (focusedArticleId !== null) {
+                        if (isSameCat) {
+                            edgeColor = catMeta.lineColor;
+                            edgeWidth = 0.85;
+                        } else {
+                            edgeColor = isLight ? '#f1f5f9' : '#111827';
+                            edgeWidth = 0.25;
+                        }
                     }
-                });
-            }
+                    
+                    edgesArray.push({
+                        from: article.id,
+                        to: sibling.id,
+                        length: 160,
+                        width: edgeWidth,
+                        color: {
+                            color: edgeColor,
+                            highlight: catMeta.color,
+                            hover: catMeta.color
+                        }
+                    });
+                }
+
+                // 4. Semantic Title Keyword Connection
+                const wordsA = article.title.split(/[\s,._]+/).filter(w => w.length >= 2);
+                for (let otherIdx = 0; otherIdx < idx; otherIdx++) {
+                    const otherArticle = catArticles[otherIdx];
+                    const wordsB = otherArticle.title.split(/[\s,._]+/).filter(w => w.length >= 2);
+                    
+                    // Exclude very common stop-words
+                    const hasCommonWord = wordsA.some(w => wordsB.includes(w) && !["기획", "기획자", "상품", "생각", "이유", "가치", "분석", "인간"].includes(w));
+                    
+                    if (hasCommonWord) {
+                        let edgeColor = isLight ? '#cbd5e1' : '#2d3748';
+                        let edgeWidth = 0.75;
+                        
+                        if (focusedArticleId !== null) {
+                            if (isSameCat) {
+                                edgeColor = catMeta.color;
+                                edgeWidth = 1.25;
+                            } else {
+                                edgeColor = isLight ? '#f1f5f9' : '#111827';
+                                edgeWidth = 0.25;
+                            }
+                        }
+                        
+                        edgesArray.push({
+                            from: article.id,
+                            to: otherArticle.id,
+                            length: 100,
+                            width: edgeWidth,
+                            color: {
+                                color: edgeColor,
+                                highlight: catMeta.color,
+                                hover: catMeta.color
+                            }
+                        });
+                        break; // Connect to at most one semantic partner to avoid visual clutter
+                    }
+                }
+            });
         });
 
         // Vis.js Data structure binding

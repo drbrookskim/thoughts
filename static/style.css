@@ -998,29 +998,39 @@ input[type="date"]:focus, input[type="number"]:focus {
 }
 
 /* Category colors with Obsidian Glow */
-.dot.philosophy {
-    background-color: #ff6b8b;
-    box-shadow: 0 0 8px #ff6b8b;
+.dot.planning-theory {
+    background-color: #a18cd1;
+    box-shadow: 0 0 8px #a18cd1;
 }
 
-.dot.tech {
-    background-color: #00f2fe;
-    box-shadow: 0 0 8px #00f2fe;
-}
-
-.dot.business {
+.dot.product-planning {
     background-color: #fbd043;
     box-shadow: 0 0 8px #fbd043;
 }
 
-.dot.leadership {
-    background-color: #a18cd1;
-    box-shadow: 0 0 8px #a18cd1;
+.dot.ai-tech {
+    background-color: #00f2fe;
+    box-shadow: 0 0 8px #00f2fe;
+}
+
+.dot.psychology {
+    background-color: #ff6b8b;
+    box-shadow: 0 0 8px #ff6b8b;
+}
+
+.dot.language {
+    background-color: #ff9f43;
+    box-shadow: 0 0 8px #ff9f43;
 }
 
 .dot.society {
     background-color: #4facfe;
     box-shadow: 0 0 8px #4facfe;
+}
+
+.dot.value {
+    background-color: #2ecc71;
+    box-shadow: 0 0 8px #2ecc71;
 }
 
 /* ==========================================================================
