@@ -734,6 +734,16 @@ document.addEventListener('DOMContentLoaded', () => {
             // Instantiate
             networkInstance = new vis.Network(container, data, options);
 
+            // Disable physics after initial stabilization to prevent nodes from drifting on click
+            networkInstance.on("stabilized", function () {
+                networkInstance.setOptions({ physics: { enabled: false } });
+            });
+
+            // Re-enable physics on drag so nodes still react organically when moved by user
+            networkInstance.on("dragStart", function () {
+                networkInstance.setOptions({ physics: { enabled: true } });
+            });
+
             // Click interaction: Focus on node to highlight cluster, but DO NOT jump to reader. Allows dragging!
             networkInstance.on("click", function (params) {
                 if (params.nodes.length > 0) {
