@@ -50,6 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabReaderBtn = document.getElementById('tab-reader-btn');
     const graphViewContainer = document.getElementById('graph-view-container');
     let networkInstance = null; // vis.js network instance
+    let nodesDataset = null;
+    let edgesDataset = null;
     let focusedArticleId = null; // Currently centered article in knowledge graph
 
     // Initialize end date to today's date
@@ -412,10 +414,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('graph-canvas');
         if (!container) return;
         
-        if (networkInstance) {
-            networkInstance.destroy();
-        }
-        
         const isLight = document.documentElement.classList.contains('theme-light');
         const catFontColor = isLight ? '#0f172a' : '#f0f3f8';
         const catBg = isLight ? '#ffffff' : '#131725';
@@ -569,6 +567,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     
                     edgesArray.push({
+                        id: `edge_prev_${article.id}_${prev.id}`,
                         from: article.id,
                         to: prev.id,
                         length: 30,
@@ -598,6 +597,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     
                     edgesArray.push({
+                        id: `edge_sib3_${article.id}_${sibling.id}`,
                         from: article.id,
                         to: sibling.id,
                         length: 50,
@@ -627,6 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     
                     edgesArray.push({
+                        id: `edge_sib7_${article.id}_${sibling.id}`,
                         from: article.id,
                         to: sibling.id,
                         length: 70,
@@ -663,6 +664,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         
                         edgesArray.push({
+                            id: `edge_sem_${article.id}_${otherArticle.id}`,
                             from: article.id,
                             to: otherArticle.id,
                             length: 45,
@@ -723,47 +725,57 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        // Instantiate
-        networkInstance = new vis.Network(container, data, options);
+        if (!networkInstance) {
+            nodesDataset = new vis.DataSet(nodesArray);
+            edgesDataset = new vis.DataSet(edgesArray);
+            const data = { nodes: nodesDataset, edges: edgesDataset };
 
-        // Click interaction: Focus on node to highlight cluster, but DO NOT jump to reader. Allows dragging!
-        networkInstance.on("click", function (params) {
-            if (params.nodes.length > 0) {
-                const nodeId = params.nodes[0];
-                if (typeof nodeId === 'number') {
-                    focusedArticleId = nodeId;
-                    selectArticle(nodeId, false, true); // Select, but DO NOT switch to Reader View
-                    initKnowledgeGraph(articles);
-                } else if (typeof nodeId === 'string' && nodeId.startsWith('cat_')) {
+            // Instantiate
+            networkInstance = new vis.Network(container, data, options);
+
+            // Click interaction: Focus on node to highlight cluster, but DO NOT jump to reader. Allows dragging!
+            networkInstance.on("click", function (params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    if (typeof nodeId === 'number') {
+                        focusedArticleId = nodeId;
+                        selectArticle(nodeId, false, true); // Select, but DO NOT switch to Reader View
+                        initKnowledgeGraph(articles);
+                    } else if (typeof nodeId === 'string' && nodeId.startsWith('cat_')) {
+                        focusedArticleId = null;
+                        initKnowledgeGraph(articles);
+                    }
+                } else {
                     focusedArticleId = null;
                     initKnowledgeGraph(articles);
                 }
-            } else {
-                focusedArticleId = null;
-                initKnowledgeGraph(articles);
-            }
-        });
+            });
 
-        // Right-click (Context Menu) or Long-press (Hold) -> Jump to Reader!
-        const openReader = function(nodeId) {
-            if (nodeId && typeof nodeId === 'number') {
-                focusedArticleId = nodeId;
-                selectArticle(nodeId, true, true); // Instantly switch to Reader View
-                initKnowledgeGraph(articles);
-            }
-        };
+            // Right-click (Context Menu) or Long-press (Hold) -> Jump to Reader!
+            const openReader = function(nodeId) {
+                if (nodeId && typeof nodeId === 'number') {
+                    focusedArticleId = nodeId;
+                    selectArticle(nodeId, true, true); // Instantly switch to Reader View
+                    initKnowledgeGraph(articles);
+                }
+            };
 
-        networkInstance.on("oncontext", function (params) {
-            params.event.preventDefault();
-            const nodeId = networkInstance.getNodeAt(params.pointer.DOM);
-            openReader(nodeId);
-        });
+            networkInstance.on("oncontext", function (params) {
+                params.event.preventDefault();
+                const nodeId = networkInstance.getNodeAt(params.pointer.DOM);
+                openReader(nodeId);
+            });
 
-        networkInstance.on("hold", function (params) {
-            if (params.nodes.length > 0) {
-                openReader(params.nodes[0]);
-            }
-        });
+            networkInstance.on("hold", function (params) {
+                if (params.nodes.length > 0) {
+                    openReader(params.nodes[0]);
+                }
+            });
+        } else {
+            // Smoothly update datasets without destroying the physics layout!
+            nodesDataset.update(nodesArray);
+            edgesDataset.update(edgesArray);
+        }
     }
 
     // ==========================================================================
