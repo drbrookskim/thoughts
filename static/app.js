@@ -485,20 +485,20 @@ document.addEventListener('DOMContentLoaded', () => {
                             border: isLight ? '#0f172a' : '#ffffff'
                         }
                     },
-                    size: 16, // Large physical sphere
+                    size: 8, // Smaller hero sphere to match Obsidian style
                     mass: 3.5, // High mass pulls other nodes visually and structurally
-                    font: { size: 18, bold: true, color: catFontColor, face: 'Outfit' },
+                    font: { size: 14, bold: true, color: catFontColor, face: 'Outfit' },
                     shadow: { enabled: true, color: catMeta.shadow, size: 25 }
                 });
             } else {
                 // Regular Article Nodes
                 let nodeLabel = article.title;
-                if (nodeLabel.length > 12) {
-                    nodeLabel = nodeLabel.substring(0, 11) + "...";
+                if (nodeLabel.length > 35) {
+                    nodeLabel = nodeLabel.substring(0, 34) + "...";
                 }
 
-                let nodeSize = 6.0;
-                let nodeFontSize = 13;
+                let nodeSize = 4.0;
+                let nodeFontSize = 11;
                 let nodeFontColor = artFontColor;
                 let nodeBgColor = artBg;
                 let nodeBorderColor = isLight ? '#cbd5e1' : '#475569';
@@ -506,13 +506,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Focus styling optimization
                 if (focusedArticleId !== null) {
                     if (isSameCat) {
-                        nodeSize = 7.0; // Sibling articles clustered beautifully
-                        nodeFontSize = 14;
+                        nodeSize = 5.0; // Sibling articles clustered beautifully
+                        nodeFontSize = 12;
                         nodeFontColor = catMeta.color; // Highlight color
                         nodeBorderColor = catMeta.color;
                     } else {
-                        nodeSize = 3.5; // Shrink unrelated articles
-                        nodeFontSize = 11;
+                        nodeSize = 2.5; // Shrink unrelated articles
+                        nodeFontSize = 9;
                         nodeFontColor = isLight ? '#cbd5e1' : '#334155'; // Fade unrelated text
                         nodeBgColor = isLight ? '#e2e8f0' : '#1e293b'; // Fade unrelated circle
                         nodeBorderColor = isLight ? '#f1f5f9' : '#111827'; // Fade unrelated border
@@ -726,24 +726,42 @@ document.addEventListener('DOMContentLoaded', () => {
         // Instantiate
         networkInstance = new vis.Network(container, data, options);
 
-        // Click interaction: Clicking an article opens it in the reader AND sets it as focused center!
+        // Click interaction: Focus on node to highlight cluster, but DO NOT jump to reader. Allows dragging!
         networkInstance.on("click", function (params) {
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0];
-                // If it's a number (meaning it's an article ID), trigger focus and jump to reader!
                 if (typeof nodeId === 'number') {
                     focusedArticleId = nodeId;
-                    selectArticle(nodeId, true); // Instantly switch to Reader View
+                    selectArticle(nodeId, false, true); // Select, but DO NOT switch to Reader View
                     initKnowledgeGraph(articles);
                 } else if (typeof nodeId === 'string' && nodeId.startsWith('cat_')) {
-                    // Clicking a category node resets focus to normal
                     focusedArticleId = null;
                     initKnowledgeGraph(articles);
                 }
             } else {
-                // Clicking blank spaces resets focus to normal
                 focusedArticleId = null;
                 initKnowledgeGraph(articles);
+            }
+        });
+
+        // Right-click (Context Menu) or Long-press (Hold) -> Jump to Reader!
+        const openReader = function(nodeId) {
+            if (nodeId && typeof nodeId === 'number') {
+                focusedArticleId = nodeId;
+                selectArticle(nodeId, true, true); // Instantly switch to Reader View
+                initKnowledgeGraph(articles);
+            }
+        };
+
+        networkInstance.on("oncontext", function (params) {
+            params.event.preventDefault();
+            const nodeId = networkInstance.getNodeAt(params.pointer.DOM);
+            openReader(nodeId);
+        });
+
+        networkInstance.on("hold", function (params) {
+            if (params.nodes.length > 0) {
+                openReader(params.nodes[0]);
             }
         });
     }
