@@ -699,7 +699,8 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             edges: {
                 width: 1,
-                hoverWidth: 1.5
+                hoverWidth: 1.5,
+                smooth: false
             },
             interaction: {
                 hover: true,
