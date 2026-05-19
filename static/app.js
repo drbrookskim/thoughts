@@ -571,7 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     edgesArray.push({
                         from: article.id,
                         to: prev.id,
-                        length: 50,
+                        length: 30,
                         width: edgeWidth,
                         color: {
                             color: edgeColor,
@@ -600,7 +600,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     edgesArray.push({
                         from: article.id,
                         to: sibling.id,
-                        length: 80,
+                        length: 50,
                         width: edgeWidth,
                         color: {
                             color: edgeColor,
@@ -629,7 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     edgesArray.push({
                         from: article.id,
                         to: sibling.id,
-                        length: 100,
+                        length: 70,
                         width: edgeWidth,
                         color: {
                             color: edgeColor,
@@ -665,7 +665,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         edgesArray.push({
                             from: article.id,
                             to: otherArticle.id,
-                            length: 70,
+                            length: 45,
                             width: edgeWidth,
                             color: {
                                 color: edgeColor,
@@ -713,12 +713,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateInterval: 50
                 },
                 barnesHut: {
-                    gravitationalConstant: -1500, // Push nodes comfortably apart for extreme readability
-                    centralGravity: 0.1, // Loosen central pulling so the galaxy spreads nicely
-                    springLength: 60, // Lengthen connections for a breathable layout
-                    springConstant: 0.015, // Significantly soften pulling spring to stop any shaking/jitter
-                    damping: 0.85, // Heavy damping fluid friction to gently absorb kinetic energy
-                    avoidOverlap: 0.3 // Complete overlap prevention guarantee
+                    gravitationalConstant: -800, // Reduced repulsion for closer cluster grouping
+                    centralGravity: 0.35, // Stronger central pull to keep everything visible on screen
+                    springLength: 40, // Shorter connections to gather nodes together
+                    springConstant: 0.015,
+                    damping: 0.85,
+                    avoidOverlap: 0.8 // Actively prevent overlaps while bunched together
                 }
             }
         };
