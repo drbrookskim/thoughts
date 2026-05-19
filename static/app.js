@@ -497,8 +497,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 let nodeSize = 3.0;
                 let nodeFontSize = 10;
                 let nodeFontColor = artFontColor;
-                let nodeBgColor = artBg;
-                let nodeBorderColor = artBg;
+                let nodeBgColor = catMeta.color; // Premium Category Glow by default!
+                let nodeBorderColor = catMeta.color;
 
                 // Focus styling optimization
                 if (focusedArticleId !== null) {
@@ -552,7 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 1. Connect to adjacent article (Spine Chain)
                 if (idx > 0) {
                     const prev = catArticles[idx - 1];
-                    let edgeColor = isLight ? '#e2e8f0' : '#1e293b';
+                    let edgeColor = catMeta.lineColor;
                     let edgeWidth = 0.65;
                     
                     if (focusedArticleId !== null) {
@@ -582,7 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 2. Connect to index-3 sibling (Short Loop / Branching)
                 if (idx > 2 && idx % 3 === 0) {
                     const sibling = catArticles[idx - 3];
-                    let edgeColor = isLight ? '#cbd5e1' : '#1e293b';
+                    let edgeColor = catMeta.lineColor;
                     let edgeWidth = 0.5;
                     
                     if (focusedArticleId !== null) {
@@ -612,7 +612,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 3. Connect to index-7 sibling (Longer structural cross-linking)
                 if (idx > 6 && idx % 7 === 0) {
                     const sibling = catArticles[idx - 7];
-                    let edgeColor = isLight ? '#cbd5e1' : '#1e293b';
+                    let edgeColor = catMeta.lineColor;
                     let edgeWidth = 0.5;
                     
                     if (focusedArticleId !== null) {
@@ -649,7 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const hasCommonWord = wordsA.some(w => wordsB.includes(w) && !["기획", "기획자", "상품", "생각", "이유", "가치", "분석", "인간"].includes(w));
                     
                     if (hasCommonWord) {
-                        let edgeColor = isLight ? '#cbd5e1' : '#2d3748';
+                        let edgeColor = catMeta.lineColor;
                         let edgeWidth = 0.75;
                         
                         if (focusedArticleId !== null) {
