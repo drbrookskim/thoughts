@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Select an article and render its markdown content
-    async function selectArticle(id, shouldSwitchTab = true) {
+    async function selectArticle(id, shouldSwitchTab = true, syncGraphFocus = true) {
         // Automatically switch to reader tab if requested
         if (shouldSwitchTab && tabGraphBtn.classList.contains('active')) {
             tabReaderBtn.classList.add('active');
@@ -138,7 +138,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         activeArticleId = id;
-        focusedArticleId = id; // Sync centered article in knowledge graph
+        if (syncGraphFocus) {
+            focusedArticleId = id; // Sync centered article in knowledge graph
+        }
         
         // Auto-close mobile sidebar when an article is selected
         if (window.innerWidth <= 1024) {
@@ -418,8 +420,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const catFontColor = isLight ? '#0f172a' : '#f0f3f8';
         const catBg = isLight ? '#ffffff' : '#131725';
         const catBgHighlight = isLight ? '#f1f5f9' : '#171c2f';
-        const artFontColor = isLight ? '#334155' : '#cbd5e1';
-        const artBg = isLight ? '#cbd5e1' : '#475569';
+        const artFontColor = isLight ? '#1e293b' : '#cbd5e1';
+        const artBg = isLight ? '#64748b' : '#475569';
         const artBgHover = isLight ? '#94a3b8' : '#8a99ad';
         const edgeBase = isLight ? '#475569' : '#334155';
 
@@ -495,9 +497,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     nodeLabel = nodeLabel.substring(0, 11) + "...";
                 }
 
-                let nodeSize = 5.0;
-                let nodeFontSize = 11;
+                let nodeSize = 6.0;
+                let nodeFontSize = 13;
                 let nodeFontColor = artFontColor;
+                let nodeBgColor = artBg;
+                let nodeBorderColor = isLight ? '#cbd5e1' : '#475569';
 
                 // Focus styling optimization
                 if (focusedArticleId !== null) {
@@ -505,13 +509,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         nodeSize = 7.0; // Sibling articles clustered beautifully
                         nodeFontSize = 14;
                         nodeFontColor = catMeta.color; // Highlight color
+                        nodeBorderColor = catMeta.color;
                     } else {
                         nodeSize = 3.5; // Shrink unrelated articles
                         nodeFontSize = 11;
-                        nodeFontColor = isLight ? '#cbd5e1' : '#334155'; // Fade unrelated
+                        nodeFontColor = isLight ? '#cbd5e1' : '#334155'; // Fade unrelated text
+                        nodeBgColor = isLight ? '#e2e8f0' : '#1e293b'; // Fade unrelated circle
+                        nodeBorderColor = isLight ? '#f1f5f9' : '#111827'; // Fade unrelated border
                     }
-                } else {
-                    nodeFontSize = 13; // Make text slightly bigger normally
                 }
 
                 nodesArray.push({
@@ -519,8 +524,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     label: nodeLabel,
                     title: `${article.title}\n(분야: ${catId} | 작성일: ${article.date})`,
                     color: {
-                        background: artBg,
-                        border: isLight ? '#cbd5e1' : '#475569',
+                        background: nodeBgColor,
+                        border: nodeBorderColor,
                         highlight: {
                             background: artBgHover,
                             border: catMeta.color
@@ -876,7 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadArticles().then(() => {
         // Automatically open the most recent article on first load
         if (articles.length > 0 && !activeArticleId) {
-            selectArticle(articles[0].id);
+            selectArticle(articles[0].id, false, false);
         }
         // Run light check silently in background only after articles are loaded
         checkBrunchSync();
