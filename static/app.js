@@ -70,7 +70,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             renderArticlesList(articles);
             updateStats();
-            initKnowledgeGraph(articles);
         } catch (error) {
             console.error('Error fetching articles:', error);
             articlesList.innerHTML = `
@@ -712,8 +711,8 @@ document.addEventListener('DOMContentLoaded', () => {
             physics: {
                 stabilization: {
                     enabled: true,
-                    iterations: 1000, // Pre-stabilize fully so it is completely calm on load
-                    updateInterval: 50
+                    iterations: 150, // Lowered from 1000 for instant loading on tab switch
+                    updateInterval: 25
                 },
                 barnesHut: {
                     gravitationalConstant: -800, // Reduced repulsion for closer cluster grouping
