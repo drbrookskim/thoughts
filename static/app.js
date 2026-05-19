@@ -415,13 +415,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!container) return;
         
         const isLight = document.documentElement.classList.contains('theme-light');
-        const catFontColor = isLight ? '#0f172a' : '#f0f3f8';
-        const catBg = isLight ? '#ffffff' : '#131725';
-        const catBgHighlight = isLight ? '#f1f5f9' : '#171c2f';
-        const artFontColor = isLight ? '#1e293b' : '#cbd5e1';
-        const artBg = isLight ? '#64748b' : '#475569';
-        const artBgHover = isLight ? '#94a3b8' : '#8a99ad';
-        const edgeBase = isLight ? '#475569' : '#334155';
+        const catFontColor = isLight ? '#0f172a' : '#e4e4e7';
+        const catBg = isLight ? '#ffffff' : '#1e1e1e';
+        const catBgHighlight = isLight ? '#f1f5f9' : '#2d2d2d';
+        const artFontColor = isLight ? '#1e293b' : '#e4e4e7';
+        const artBg = isLight ? '#64748b' : '#a1a1aa';
+        const artBgHover = isLight ? '#94a3b8' : '#d4d4d8';
+        const edgeBase = isLight ? '#475569' : '#27272a';
 
         // 1. Curated 7-Category Metadata Definition
         const categories = {
@@ -483,9 +483,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             border: isLight ? '#0f172a' : '#ffffff'
                         }
                     },
-                    size: 8, // Smaller hero sphere to match Obsidian style
+                    size: 4, // Smaller hero sphere to match Obsidian style
                     mass: 3.5, // High mass pulls other nodes visually and structurally
-                    font: { size: 14, bold: true, color: catFontColor, face: 'Outfit' },
+                    font: { size: 12, bold: true, color: catFontColor, face: 'Outfit' },
                     shadow: { enabled: true, color: catMeta.shadow, size: 25 }
                 });
             } else {
@@ -495,22 +495,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     nodeLabel = nodeLabel.substring(0, 34) + "...";
                 }
 
-                let nodeSize = 4.0;
-                let nodeFontSize = 11;
+                let nodeSize = 3.0;
+                let nodeFontSize = 10;
                 let nodeFontColor = artFontColor;
                 let nodeBgColor = artBg;
-                let nodeBorderColor = isLight ? '#cbd5e1' : '#475569';
+                let nodeBorderColor = artBg;
 
                 // Focus styling optimization
                 if (focusedArticleId !== null) {
                     if (isSameCat) {
-                        nodeSize = 5.0; // Sibling articles clustered beautifully
-                        nodeFontSize = 12;
+                        nodeSize = 4.0; // Sibling articles clustered beautifully
+                        nodeFontSize = 11;
                         nodeFontColor = catMeta.color; // Highlight color
                         nodeBorderColor = catMeta.color;
                     } else {
-                        nodeSize = 2.5; // Shrink unrelated articles
-                        nodeFontSize = 9;
+                        nodeSize = 2.0; // Shrink unrelated articles
+                        nodeFontSize = 8;
                         nodeFontColor = isLight ? '#cbd5e1' : '#334155'; // Fade unrelated text
                         nodeBgColor = isLight ? '#e2e8f0' : '#1e293b'; // Fade unrelated circle
                         nodeBorderColor = isLight ? '#f1f5f9' : '#111827'; // Fade unrelated border

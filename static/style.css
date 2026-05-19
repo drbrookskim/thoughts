@@ -958,6 +958,49 @@ input[type="date"]:focus, input[type="number"]:focus {
     flex-direction: column;
 }
 
+body:not(.theme-light) .graph-view {
+    background: #1e1e1e !important;
+}
+
+.obsidian-ui-top {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.obsidian-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    pointer-events: auto;
+}
+
+.obsidian-actions {
+    position: absolute;
+    right: 24px;
+    display: flex;
+    gap: 16px;
+    color: var(--text-secondary);
+    font-size: 16px;
+    pointer-events: auto;
+}
+
+.obsidian-actions i {
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.obsidian-actions i:hover {
+    color: var(--text-primary);
+}
+
 #graph-canvas {
     flex: 1;
     width: 100%;
