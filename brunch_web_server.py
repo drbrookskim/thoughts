@@ -5,7 +5,7 @@ from datetime import datetime
 from flask import Flask, jsonify, request, render_template, send_from_directory
 from brunch_scraper import BrunchScraper, BrunchMarkdownConverter
 
-app = Flask(__name__, template_folder='templates', static_folder='static')
+app = Flask(__name__, template_folder='.', static_folder='static')
 
 # Constants
 ARTICLES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'brunch_articles'))
