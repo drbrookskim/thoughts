@@ -485,7 +485,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     },
                     size: 16, // Large physical sphere
                     mass: 3.5, // High mass pulls other nodes visually and structurally
-                    font: { size: 14, bold: true, color: catFontColor, face: 'Outfit' },
+                    font: { size: 18, bold: true, color: catFontColor, face: 'Outfit' },
                     shadow: { enabled: true, color: catMeta.shadow, size: 25 }
                 });
             } else {
@@ -503,13 +503,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (focusedArticleId !== null) {
                     if (isSameCat) {
                         nodeSize = 7.0; // Sibling articles clustered beautifully
-                        nodeFontSize = 12;
+                        nodeFontSize = 14;
                         nodeFontColor = catMeta.color; // Highlight color
                     } else {
                         nodeSize = 3.5; // Shrink unrelated articles
-                        nodeFontSize = 9;
+                        nodeFontSize = 11;
                         nodeFontColor = isLight ? '#cbd5e1' : '#334155'; // Fade unrelated
                     }
+                } else {
+                    nodeFontSize = 13; // Make text slightly bigger normally
                 }
 
                 nodesArray.push({
@@ -564,7 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     edgesArray.push({
                         from: article.id,
                         to: prev.id,
-                        length: 80,
+                        length: 50,
                         width: edgeWidth,
                         color: {
                             color: edgeColor,
@@ -593,7 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     edgesArray.push({
                         from: article.id,
                         to: sibling.id,
-                        length: 120,
+                        length: 80,
                         width: edgeWidth,
                         color: {
                             color: edgeColor,
@@ -622,7 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     edgesArray.push({
                         from: article.id,
                         to: sibling.id,
-                        length: 160,
+                        length: 100,
                         width: edgeWidth,
                         color: {
                             color: edgeColor,
@@ -658,7 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         edgesArray.push({
                             from: article.id,
                             to: otherArticle.id,
-                            length: 100,
+                            length: 70,
                             width: edgeWidth,
                             color: {
                                 color: edgeColor,
@@ -706,12 +708,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateInterval: 50
                 },
                 barnesHut: {
-                    gravitationalConstant: -3000, // Push nodes comfortably apart for extreme readability
-                    centralGravity: 0.05, // Loosen central pulling so the galaxy spreads nicely
-                    springLength: 140, // Lengthen connections for a breathable layout
-                    springConstant: 0.008, // Significantly soften pulling spring to stop any shaking/jitter
+                    gravitationalConstant: -1500, // Push nodes comfortably apart for extreme readability
+                    centralGravity: 0.1, // Loosen central pulling so the galaxy spreads nicely
+                    springLength: 60, // Lengthen connections for a breathable layout
+                    springConstant: 0.015, // Significantly soften pulling spring to stop any shaking/jitter
                     damping: 0.85, // Heavy damping fluid friction to gently absorb kinetic energy
-                    avoidOverlap: 1.0 // Complete overlap prevention guarantee
+                    avoidOverlap: 0.3 // Complete overlap prevention guarantee
                 }
             }
         };
