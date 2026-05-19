@@ -1,0 +1,5 @@
+Signnith(Stock-Search-Service)/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
