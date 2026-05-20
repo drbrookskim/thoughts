@@ -498,13 +498,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1. Curated 7-Category Metadata Definition
         const categories = {
-            "기획론": { label: "기획론", color: "#a18cd1", lineColor: "#504668", shadow: "rgba(161, 140, 209, 0.2)" },
-            "상품기획": { label: "상품기획", color: "#fbd043", lineColor: "#7d6821", shadow: "rgba(251, 208, 67, 0.2)" },
-            "AI와 기술": { label: "AI와 기술", color: "#00f2fe", lineColor: "#00797f", shadow: "rgba(0, 242, 254, 0.2)" },
-            "인간과 심리": { label: "인간과 심리", color: "#ff6b8b", lineColor: "#803545", shadow: "rgba(255, 107, 139, 0.2)" },
-            "사고와 언어": { label: "사고와 언어", color: "#ff9f43", lineColor: "#805022", shadow: "rgba(255, 159, 67, 0.2)" },
-            "관계와 사회": { label: "관계와 사회", color: "#4facfe", lineColor: "#27567f", shadow: "rgba(79, 172, 254, 0.2)" },
-            "경제와 가치": { label: "경제와 가치", color: "#2ecc71", lineColor: "#176638", shadow: "rgba(46, 204, 113, 0.2)" }
+            "기획론": { label: "기획론", color: "#a18cd1", lineColor: "#504668", labelColorLight: "#4a3b6c", shadow: "rgba(161, 140, 209, 0.2)" },
+            "상품기획": { label: "상품기획", color: "#fbd043", lineColor: "#7d6821", labelColorLight: "#6a520d", shadow: "rgba(251, 208, 67, 0.2)" },
+            "AI와 기술": { label: "AI와 기술", color: "#00f2fe", lineColor: "#00797f", labelColorLight: "#006266", shadow: "rgba(0, 242, 254, 0.2)" },
+            "인간과 심리": { label: "인간과 심리", color: "#ff6b8b", lineColor: "#803545", labelColorLight: "#782538", shadow: "rgba(255, 107, 139, 0.2)" },
+            "사고와 언어": { label: "사고와 언어", color: "#ff9f43", lineColor: "#805022", labelColorLight: "#78440d", shadow: "rgba(255, 159, 67, 0.2)" },
+            "관계와 사회": { label: "관계와 사회", color: "#4facfe", lineColor: "#27567f", labelColorLight: "#184e77", shadow: "rgba(79, 172, 254, 0.2)" },
+            "경제와 가치": { label: "경제와 가치", color: "#2ecc71", lineColor: "#176638", labelColorLight: "#135c32", shadow: "rgba(46, 204, 113, 0.2)" }
         };
 
         const nodesArray = [];
@@ -579,7 +579,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (isSameCat) {
                         nodeSize = 4.0; // Sibling articles clustered beautifully
                         nodeFontSize = 11;
-                        nodeFontColor = isLight ? catMeta.lineColor : catMeta.color; // Highlight color (darker on light theme)
+                        nodeFontColor = isLight ? catMeta.labelColorLight : catMeta.color; // Highlight color (darker on light theme)
                         nodeBorderColor = catMeta.color;
                     } else {
                         nodeSize = 2.0; // Shrink unrelated articles
@@ -593,7 +593,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (catId === activeCategoryFilter) {
                         nodeSize = 4.0; // Highlight selected category articles
                         nodeFontSize = 11;
-                        nodeFontColor = isLight ? catMeta.lineColor : catMeta.color; // Highlight color (darker on light theme)
+                        nodeFontColor = isLight ? catMeta.labelColorLight : catMeta.color; // Highlight color (darker on light theme)
                         nodeBorderColor = catMeta.color;
                     } else {
                         nodeSize = 1.5; // Highly shrink other articles

@@ -60,6 +60,40 @@ def parse_markdown_metadata(filepath):
         
     return title, date_str, url
 
+def classify_article(filename, title):
+    t = (filename + " " + title).lower()
+    
+    # 1. AI와 기술 (AI & Tech)
+    if any(k in t for k in ["ai", "웹", "스마트폰", "기술", "프로그래머", "페이지랭크", "토큰", "인공지능", "llm", "rag", "추론", "pruning", "컴퓨터", "코드", "딥시크", "deepseek", "기기 생태계", "커맨드라인", "p-np", "양자역학"]):
+        return "AI와 기술"
+        
+    # 2. 상품기획 (Product Planning)
+    if any(k in t for k in ["상품기획", "상품 기획", "대체재", "보완재", "쇼핑카트", "서비스에 대한 단상", "워치", "여행 상품", "경험과 상품기획", "상품의 운명", "스마트폰 경쟁"]):
+        return "상품기획"
+        
+    # 3. 경제와 가치 (Economy & Value)
+    if any(k in t for k in ["경제", "가치", "가격", "돈", "노동", "한계효용", "유료", "보상", "환산", "소유", "점유", "토큰사회", "3대 500", "따밥"]):
+        return "경제와 가치"
+        
+    # 4. 관계와 사회 (Relationship & Society)
+    if any(k in t for k in ["관계", "사회", "리더", "무례", "권위", "조직", "동료", "타인", "공생", "예절", "계급", "지정학", "평등", "친분", "양의 군집", "군집본능", "회사", "소통의 부재", "소통의 본질", "인간관계", "역할"]):
+        return "관계와 사회"
+
+    # 5. 사고와 언어 (Thought & Language)
+    if any(k in t for k in ["사고", "언어", "생각", "비판적", "문장", "말맛", "소통", "질문", "듣기", "대화", "설득", "고집", "이해", "분석", "해석", "맥락", "본성", "지능", "의식"]):
+        return "사고와 언어"
+        
+    # 6. 인간과 심리 (Human & Psychology)
+    if any(k in t for k in ["인간", "심리", "감정", "외로움", "고독", "죽음", "선택", "책임", "의지", "행복", "나를", "정체성", "마인드", "이해", "아는 것", "자아", "두 얼굴", "착각", "기억", "뇌", "생물학", "개인차", "나이", "배움", "인생", "눈과 비", "굳은살", "그리했다면", "버티는", "소소한", "쓸쓸함", "경험"]):
+        return "인간과 심리"
+        
+    # 7. 기획론 (Planning Theory)
+    if any(k in t for k in ["기획", "기획자", "기획력", "기획의", "기획론", "기획적", "기획다움", "기획관점", "핍진성", "시나리오", "성공", "실패", "결정", "판단", "지능", "상수제어", "의도된"]):
+        return "기획론"
+        
+    return "기획론"
+
+
 def run_scraper_thread(author, start_date_str, end_date_str, start_id, output_dir):
     global scraper_status
     
@@ -158,6 +192,20 @@ def run_scraper_thread(author, start_date_str, end_date_str, start_id, output_di
     scraper_status["is_running"] = False
     scraper_status["finished"] = True
     scraper_status["log"].append(f"[*] 크롤링이 안전하게 완료되었습니다! 총 {saved_count}개 글 저장 완료.")
+    
+    if saved_count > 0:
+        scraper_status["log"].append("[*] 새로운 글이 수집되었습니다. 정적 API 및 인덱스 파일을 빌드합니다...")
+        try:
+            import subprocess
+            # Use current interpreter to execute build_static.py
+            import sys
+            res = subprocess.run([sys.executable, "build_static.py"], capture_output=True, text=True)
+            if res.returncode == 0:
+                scraper_status["log"].append("[*] 정적 파일 빌드가 성공적으로 완료되었습니다!")
+            else:
+                scraper_status["log"].append(f"[경고] 빌드 실패: {res.stderr}")
+        except Exception as e:
+            scraper_status["log"].append(f"[경고] 빌드 중 오류 발생: {e}")
 
 def requests_get_helper(url, headers):
     import requests
@@ -251,6 +299,7 @@ def check_new_articles():
     })
 
 
+@app.route('/api/articles.json', methods=['GET'])
 @app.route('/api/articles', methods=['GET'])
 def get_articles():
     """
@@ -270,6 +319,7 @@ def get_articles():
             article_id = int(match.group(1)) if match else 0
             
             title, date_str, url = parse_markdown_metadata(filepath)
+            category = classify_article(filename, title)
             
             articles.append({
                 "id": article_id,
@@ -277,7 +327,8 @@ def get_articles():
                 "title": title,
                 "date": date_str,
                 "url": url,
-                "size_kb": round(os.path.getsize(filepath) / 1024, 2)
+                "size_kb": round(os.path.getsize(filepath) / 1024, 2),
+                "category": category
             })
             
     # Sort articles by ID in descending order (newest first)
@@ -285,10 +336,11 @@ def get_articles():
     return jsonify(articles)
 
 
+@app.route('/api/article/<int:article_id>.json', methods=['GET'])
 @app.route('/api/article/<int:article_id>', methods=['GET'])
 def get_article_content(article_id):
     """
-    Returns the markdown content of a specific article.
+    Returns the markdown content and metadata of a specific article.
     """
     if not os.path.exists(ARTICLES_DIR):
         return jsonify({"error": "저장소가 존재하지 않습니다."}), 404
@@ -306,9 +358,16 @@ def get_article_content(article_id):
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
+        title, date_str, url = parse_markdown_metadata(filepath)
+        category = classify_article(target_filename, title)
         return jsonify({
             "id": article_id,
+            "title": title,
+            "date": date_str,
+            "url": url,
             "filename": target_filename,
+            "size_kb": round(os.path.getsize(filepath) / 1024, 2),
+            "category": category,
             "content": content
         })
     except Exception as e:
