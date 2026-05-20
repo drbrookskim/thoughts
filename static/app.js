@@ -55,28 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let edgesDataset = null;
     let focusedArticleId = null; // Currently centered article in knowledge graph
 
-    // Initialize end date to today's date
-    const today = new Date().toISOString().split('T')[0];
-    if (inputEndDate) inputEndDate.value = today;
-
     // Check if running in local Flask environment (port 5050)
     const isFlaskEnv = window.location.port === '5050';
-    if (!isFlaskEnv) {
-        if (scraperFormContainer) {
-            scraperFormContainer.innerHTML = `
-                <div class="static-notice-card" style="padding: 16px; border-radius: var(--border-radius-md); background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); font-size: 14px; line-height: 1.6; color: #fca5a5; margin-bottom: 0;">
-                    <h4 style="margin: 0 0 8px 0; color: #f87171; display: flex; align-items: center; gap: 8px; font-weight: 600;">
-                        <i class="fa-solid fa-triangle-exclamation"></i> 로컬 크롤러 구동 안내
-                    </h4>
-                    <p style="margin: 0 0 10px 0;">현재 접속하신 환경은 <strong>GitHub Pages 정적 웹사이트</strong>입니다. 브런치 스토리 크롤링은 서버 기능이 필요하므로 로컬 환경에서만 실행할 수 있습니다.</p>
-                    <div style="background: rgba(15, 23, 42, 0.4); padding: 10px; border-radius: var(--border-radius-sm); border: 1px solid rgba(255,255,255,0.05); font-family: monospace; font-size: 13px; margin-bottom: 10px; color: #38bdf8;">
-                        $ python brunch_web_server.py
-                    </div>
-                    <p style="margin: 0;">위 명령어로 로컬 서버를 가동한 뒤, <a href="http://127.0.0.1:5050" target="_blank" style="color: #60a5fa; text-decoration: underline; font-weight: bold;">http://127.0.0.1:5050</a>에 접속하여 수집을 진행해 주세요.</p>
-                </div>
-            `;
-        }
-    }
 
     // ==========================================================================
     // 📂 ARTICLE MANAGEMENT & FETCHING
