@@ -528,7 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (isSameCat) {
                         nodeSize = 4.0; // Sibling articles clustered beautifully
                         nodeFontSize = 11;
-                        nodeFontColor = catMeta.color; // Highlight color
+                        nodeFontColor = isLight ? catMeta.lineColor : catMeta.color; // Highlight color (darker on light theme)
                         nodeBorderColor = catMeta.color;
                     } else {
                         nodeSize = 2.0; // Shrink unrelated articles
@@ -542,7 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (catId === activeCategoryFilter) {
                         nodeSize = 4.0; // Highlight selected category articles
                         nodeFontSize = 11;
-                        nodeFontColor = catMeta.color;
+                        nodeFontColor = isLight ? catMeta.lineColor : catMeta.color; // Highlight color (darker on light theme)
                         nodeBorderColor = catMeta.color;
                     } else {
                         nodeSize = 1.5; // Highly shrink other articles
