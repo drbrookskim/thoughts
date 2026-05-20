@@ -13,16 +13,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const statCount = document.getElementById('stat-count');
     const statLatestDate = document.getElementById('stat-latest-date');
     
-    const toggleScraperBtn = document.getElementById('toggle-scraper-btn');
-    const scraperFormContainer = document.getElementById('scraper-form-container');
-    const btnStartScrape = document.getElementById('btn-start-scrape');
+    // FAB & Admin Modal Elements
+    const fabSyncBtn = document.getElementById('fab-sync-btn');
+    const adminModal = document.getElementById('admin-modal');
+    const btnModalClose = document.getElementById('btn-modal-close');
+    const modalStatePassword = document.getElementById('modal-state-password');
+    const modalStateConsole = document.getElementById('modal-state-console');
+    const adminPasswordForm = document.getElementById('admin-password-form');
+    const adminPasswordInput = document.getElementById('admin-password-input');
+    const passwordErrorMsg = document.getElementById('password-error-msg');
     
-    const inputAuthor = document.getElementById('input-author');
-    const inputStartDate = document.getElementById('input-start-date');
-    const inputEndDate = document.getElementById('input-end-date');
-    const inputStartId = document.getElementById('input-start-id');
-    
-    const monitorPanel = document.getElementById('monitor-panel');
     const scraperStatusBadge = document.getElementById('scraper-status-badge');
     const consoleLogs = document.getElementById('console-logs');
     const monitorProgressCount = document.getElementById('monitor-progress-count');
@@ -267,36 +267,68 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ==========================================================================
-    // ⚙️ SCRAPER CONTROL PANEL (ACCORDION & POST TRIGGER)
+    // ⚙️ SCRAPER CONTROL VIA FAB & MODAL
     // ==========================================================================
+    let isScraperActive = false;
 
-    // Toggle scraping options accordion
-    toggleScraperBtn.addEventListener('click', () => {
-        toggleScraperBtn.classList.toggle('active');
-        scraperFormContainer.classList.toggle('hidden');
+    // Click listener on FAB Sync button
+    fabSyncBtn.addEventListener('click', async () => {
+        // Check current running state from server first
+        try {
+            const response = await fetch('/api/scrape/status');
+            const status = await response.json();
+            
+            if (status.is_running) {
+                // If running, open console log immediately
+                openModal(true);
+                startLogsPolling();
+            } else {
+                // If not running, ask for password
+                openModal(false);
+            }
+        } catch (error) {
+            console.error("Error checking scraper status on FAB click:", error);
+            openModal(false); // Fallback to password state
+        }
     });
 
-    // Start background scraper
-    btnStartScrape.addEventListener('click', async () => {
-        const author = inputAuthor.value.trim();
-        const startDate = inputStartDate.value;
-        const endDate = inputEndDate.value;
-        const startId = parseInt(inputStartId.value);
+    // Close Modal
+    btnModalClose.addEventListener('click', () => {
+        adminModal.classList.add('hidden');
+        document.body.classList.remove('modal-open');
+    });
 
-        if (!author) {
-            alert('브런치 작가 ID를 입력해주세요.');
-            return;
+    // Close Modal on clicking backdrop
+    adminModal.addEventListener('click', (e) => {
+        if (e.target === adminModal) {
+            adminModal.classList.add('hidden');
+            document.body.classList.remove('modal-open');
         }
+    });
 
-        // Show monitoring terminal console and hide forms
-        scraperFormContainer.classList.add('hidden');
-        toggleScraperBtn.classList.remove('active');
-        monitorPanel.classList.remove('hidden');
-        
-        consoleLogs.textContent = "[*] 크롤링 작업을 준비하는 중...\n";
-        scraperStatusBadge.textContent = "준비 중";
-        scraperStatusBadge.className = "status-badge running";
-        
+    // Open Modal function
+    function openModal(showConsole = false) {
+        adminModal.classList.remove('hidden');
+        document.body.classList.add('modal-open');
+        passwordErrorMsg.classList.add('hidden');
+        adminPasswordInput.value = '';
+
+        if (showConsole) {
+            modalStatePassword.classList.add('hidden');
+            modalStateConsole.classList.remove('hidden');
+        } else {
+            modalStatePassword.classList.remove('hidden');
+            modalStateConsole.classList.add('hidden');
+            setTimeout(() => adminPasswordInput.focus(), 100);
+        }
+    }
+
+    // Submit password and start scraping
+    adminPasswordForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const password = adminPasswordInput.value;
+        passwordErrorMsg.classList.add('hidden');
+
         try {
             const response = await fetch('/api/scrape', {
                 method: 'POST',
@@ -304,35 +336,45 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    author: author,
-                    start_date: startDate,
-                    end_date: endDate,
-                    start_id: startId
+                    password: password
                 })
             });
 
             const result = await response.json();
 
-            if (result.error) {
-                consoleLogs.textContent += `[오류] 시작에 실패했습니다: ${result.error}\n`;
-                scraperStatusBadge.textContent = "에러";
-                scraperStatusBadge.className = "status-badge";
+            if (response.status === 401 || result.error) {
+                // Shake modal content and show error
+                const modalContent = document.querySelector('.modal-content');
+                modalContent.classList.add('shake');
+                setTimeout(() => modalContent.classList.remove('shake'), 400);
+
+                passwordErrorMsg.textContent = result.error || "비밀번호가 일치하지 않습니다.";
+                passwordErrorMsg.classList.remove('hidden');
+                adminPasswordInput.focus();
                 return;
             }
 
-            // Start polling the scraper status
+            // Transition to Console state
+            modalStatePassword.classList.add('hidden');
+            modalStateConsole.classList.remove('hidden');
+            consoleLogs.textContent = "[*] 관리자 승인 완료. 크롤링 작업을 준비하는 중...\n";
+            scraperStatusBadge.textContent = "준비 중";
+            scraperStatusBadge.className = "status-badge running";
+            fabSyncBtn.classList.add('spinning');
+
+            // Start logs polling
             startLogsPolling();
 
         } catch (error) {
-            consoleLogs.textContent += `[오류] 서버 요청 실패: ${error.message}\n`;
-            scraperStatusBadge.textContent = "연결 오류";
-            scraperStatusBadge.className = "status-badge";
+            passwordErrorMsg.textContent = `서버 연결 오류: ${error.message}`;
+            passwordErrorMsg.classList.remove('hidden');
         }
     });
 
     // Polling interval loop for real-time console status
     function startLogsPolling() {
         if (scrapeInterval) clearInterval(scrapeInterval);
+        fabSyncBtn.classList.add('spinning');
         
         scrapeInterval = setInterval(async () => {
             try {
@@ -345,25 +387,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (status.is_running) {
                     scraperStatusBadge.textContent = `글 ID ${status.current_id} 분석 중`;
                     scraperStatusBadge.className = "status-badge running";
+                    isScraperActive = true;
                 } else if (status.finished) {
                     scraperStatusBadge.textContent = "수집 완료";
                     scraperStatusBadge.className = "status-badge";
+                    fabSyncBtn.classList.remove('spinning');
                     clearInterval(scrapeInterval);
                     scrapeInterval = null;
+                    isScraperActive = false;
                     
                     // Reload the articles sidebar immediately to show new arrivals!
                     loadArticles();
+                    
+                    // If notification banner is showing, hide it since we synced
+                    syncNotificationBanner.classList.add('hidden');
                 } else if (status.error) {
                     scraperStatusBadge.textContent = "오류 발생";
                     scraperStatusBadge.className = "status-badge";
+                    fabSyncBtn.classList.remove('spinning');
                     clearInterval(scrapeInterval);
                     scrapeInterval = null;
+                    isScraperActive = false;
                 }
 
                 // Render latest logs
                 if (status.log && status.log.length > 0) {
                     consoleLogs.textContent = status.log.join('\n');
-                    
                     // Auto-scroll terminal console to bottom
                     consoleLogs.scrollTop = consoleLogs.scrollHeight;
                 }
@@ -371,12 +420,14 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (error) {
                 console.error("Error polling scraper status:", error);
             }
-        }, 1000);
+        }, 800);
     }
 
     // Check on page load if scraper is already running from a previous instance
     async function checkScraperActiveState() {
-        if (window.location.port !== '5050') {
+        if (window.location.port !== '5050' && !window.location.hostname.includes('127.0.0.1')) {
+            // Disable sync checks on GitHub Pages or other non-local environments
+            fabSyncBtn.style.display = 'none';
             return;
         }
         try {
@@ -384,11 +435,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const status = await response.json();
             
             if (status.is_running) {
-                monitorPanel.classList.remove('hidden');
+                fabSyncBtn.classList.add('spinning');
                 startLogsPolling();
             }
         } catch (error) {
-            console.error("Error checking scraper running status:", error);
+            console.error("Error checking initial scraper state:", error);
         }
     }
 
@@ -883,29 +934,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Sync button logic: Auto-calculate highest ID + 1 and trigger seamless scrape!
+    // Sync button logic: Open password validation modal immediately!
     btnBannerSync.addEventListener('click', () => {
         syncNotificationBanner.classList.add('hidden');
         
-        // Open control panel accordion
-        toggleScraperBtn.classList.add('active');
-        scraperFormContainer.classList.remove('hidden');
-        
-        // Smart ID calculation: auto-fill start ID to (highest local ID + 1)
-        if (articles.length > 0) {
-            const highestId = articles[0].id; // Sorted newest first
-            inputStartId.value = highestId + 1;
-        } else {
-            inputStartId.value = 164;
-        }
-        
-        // Scroll accordion neatly into view
-        toggleScraperBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
-        // Quick visual delay so user enjoys the panel slide open, then trigger scrape!
-        setTimeout(() => {
-            btnStartScrape.click();
-        }, 600);
+        // Open the modal
+        fabSyncBtn.click();
     });
 
     btnBannerClose.addEventListener('click', () => {

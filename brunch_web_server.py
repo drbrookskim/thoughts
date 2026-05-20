@@ -10,6 +10,7 @@ app = Flask(__name__, template_folder='.', static_folder='static')
 # Constants
 ARTICLES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'brunch_articles'))
 os.makedirs(ARTICLES_DIR, exist_ok=True)
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "drbrooks123")
 
 # Global scraper status to support real-time progress tracking
 scraper_status = {
@@ -79,7 +80,7 @@ def run_scraper_thread(author, start_date_str, end_date_str, start_id, output_di
     
     current_id = start_id
     consecutive_404 = 0
-    max_consecutive_404 = 30
+    max_consecutive_404 = 10
     saved_count = 0
     
     while consecutive_404 < max_consecutive_404:
@@ -314,6 +315,20 @@ def get_article_content(article_id):
         return jsonify({"error": f"파일 읽기 오류: {e}"}), 500
 
 
+def get_latest_local_id():
+    """
+    Scans the articles directory for markdown files and returns the maximum numeric ID.
+    """
+    max_id = 0
+    if os.path.exists(ARTICLES_DIR):
+        for filename in os.listdir(ARTICLES_DIR):
+            if filename.endswith('.md'):
+                match = re.match(r'^(\d+)_', filename)
+                if match:
+                    max_id = max(max_id, int(match.group(1)))
+    return max_id
+
+
 @app.route('/api/scrape', methods=['POST'])
 def start_scraping():
     """
@@ -325,10 +340,15 @@ def start_scraping():
         return jsonify({"error": "이미 크롤링이 진행 중입니다."}), 400
         
     data = request.json or {}
+    password = data.get("password")
+    
+    if password != ADMIN_PASSWORD:
+        return jsonify({"error": "비밀번호가 올바르지 않습니다."}), 401
+        
     author = data.get("author", "drbrooks")
-    start_date = data.get("start_date", "2025-12-14")
-    end_date = data.get("end_date", datetime.today().strftime('%Y-%m-%d'))
-    start_id = int(data.get("start_id", 164))
+    start_id = get_latest_local_id() + 1
+    start_date = "2000-01-01"
+    end_date = datetime.today().strftime('%Y-%m-%d')
     
     # Initialize status
     scraper_status = {

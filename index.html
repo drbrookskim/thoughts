@@ -69,53 +69,7 @@
                 </div>
             </div>
 
-            <!-- Scraper Control Panel -->
-            <div class="control-panel">
-                <div class="panel-header" id="toggle-scraper-btn">
-                    <h2><i class="fa-solid fa-gears"></i> 신규 크롤러 구동</h2>
-                    <i class="fa-solid fa-chevron-down toggle-icon"></i>
-                </div>
-                <div class="panel-body hidden" id="scraper-form-container">
-                    <div class="input-group">
-                        <label for="input-author">작가 ID</label>
-                        <div class="input-wrapper">
-                            <span class="input-prefix">@</span>
-                            <input type="text" id="input-author" value="drbrooks" placeholder="작가 ID">
-                        </div>
-                    </div>
-                    <div class="input-row">
-                        <div class="input-group">
-                            <label for="input-start-date">시작 날짜</label>
-                            <input type="date" id="input-start-date" value="2025-12-14">
-                        </div>
-                        <div class="input-group">
-                            <label for="input-end-date">종료 날짜</label>
-                            <input type="date" id="input-end-date">
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label for="input-start-id">시작 글 ID</label>
-                        <input type="number" id="input-start-id" value="164" min="1">
-                    </div>
-                    <button class="btn btn-primary" id="btn-start-scrape">
-                        <i class="fa-solid fa-circle-play"></i> 크롤링 시작
-                    </button>
-                </div>
-            </div>
 
-            <!-- Live Scraping Monitor (Log Console) -->
-            <div class="monitor-panel hidden" id="monitor-panel">
-                <div class="panel-header">
-                    <h2><i class="fa-solid fa-terminal"></i> 실시간 수집 모니터</h2>
-                    <span class="status-badge pulse" id="scraper-status-badge">대기 중</span>
-                </div>
-                <div class="console-wrapper">
-                    <pre class="console" id="console-logs">준비 완료...</pre>
-                </div>
-                <div class="monitor-footer">
-                    <span class="scraped-progress">수집 완료: <strong id="monitor-progress-count">0</strong>개</span>
-                </div>
-            </div>
 
             <!-- Articles List -->
             <div class="articles-list-container">
@@ -217,6 +171,50 @@
             </article>
         </main>
         
+    </div>
+
+    <!-- ⚙️ Floating Admin Sync Button -->
+    <button class="fab-sync-btn" id="fab-sync-btn" title="새 글 가져오기 (관리자 전용)">
+        <i class="fa-solid fa-arrows-rotate"></i>
+    </button>
+
+    <!-- 🔒 Admin Sync Modal Dialog -->
+    <div id="admin-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button class="modal-close-btn" id="btn-modal-close" title="닫기"><i class="fa-solid fa-xmark"></i></button>
+            
+            <!-- Modal State 1: Password Input -->
+            <div id="modal-state-password" class="modal-state">
+                <div class="modal-header">
+                    <div class="modal-icon"><i class="fa-solid fa-lock"></i></div>
+                    <h2>관리자 인증</h2>
+                    <p>신규 글을 동기화하여 가져오려면 관리자 비밀번호를 입력해주세요.</p>
+                </div>
+                <form id="admin-password-form" onsubmit="event.preventDefault();">
+                    <div class="password-input-group">
+                        <input type="password" id="admin-password-input" placeholder="비밀번호 입력" required autocomplete="current-password">
+                        <button type="submit" class="btn btn-primary" id="btn-submit-password">확인</button>
+                    </div>
+                    <div class="error-message hidden" id="password-error-msg">비밀번호가 일치하지 않습니다.</div>
+                </form>
+            </div>
+
+            <!-- Modal State 2: Scraping Console Monitor -->
+            <div id="modal-state-console" class="modal-state hidden">
+                <div class="modal-header">
+                    <div class="modal-icon pulse"><i class="fa-solid fa-terminal"></i></div>
+                    <h2>실시간 동기화 모니터</h2>
+                    <p>최신 포스트 수집을 위한 백그라운드 스크래핑이 진행 중입니다.</p>
+                </div>
+                <div class="console-wrapper">
+                    <pre class="console" id="console-logs">수집 시작 대기 중...</pre>
+                </div>
+                <div class="console-footer">
+                    <span class="scraped-progress">수집 완료: <strong id="monitor-progress-count">0</strong>개</span>
+                    <span class="status-badge pulse" id="scraper-status-badge">동기화 중</span>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- JavaScript logic -->
