@@ -1019,7 +1019,7 @@ body:not(.theme-light) .graph-view {
     flex-direction: column;
     gap: 8px;
     backdrop-filter: blur(10px);
-    pointer-events: none;
+    pointer-events: auto;
     z-index: 10;
     box-shadow: var(--shadow-premium);
 }
@@ -1031,6 +1031,35 @@ body:not(.theme-light) .graph-view {
     display: flex;
     align-items: center;
     gap: 10px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 4px 8px;
+    border-radius: 6px;
+    user-select: none;
+}
+
+.legend-item:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+body.theme-light .legend-item:hover {
+    background: rgba(15, 23, 42, 0.05);
+}
+
+.legend-item.active {
+    color: var(--text-primary);
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.theme-light .legend-item.active {
+    background: rgba(15, 23, 42, 0.08);
+}
+
+.legend-item.inactive {
+    opacity: 0.3;
+    filter: grayscale(60%);
 }
 
 .dot {

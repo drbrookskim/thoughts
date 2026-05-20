@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let articles = [];
     let activeArticleId = null;
     let scrapeInterval = null;
+    let activeCategoryFilter = null;
 
     // DOM Elements
     const statCount = document.getElementById('stat-count');
@@ -536,6 +537,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         nodeBgColor = isLight ? '#e2e8f0' : '#1e293b'; // Fade unrelated circle
                         nodeBorderColor = isLight ? '#f1f5f9' : '#111827'; // Fade unrelated border
                     }
+                } else if (activeCategoryFilter !== null) {
+                    // Category filter styling optimization
+                    if (catId === activeCategoryFilter) {
+                        nodeSize = 4.0; // Highlight selected category articles
+                        nodeFontSize = 11;
+                        nodeFontColor = catMeta.color;
+                        nodeBorderColor = catMeta.color;
+                    } else {
+                        nodeSize = 1.5; // Highly shrink other articles
+                        nodeFontSize = 0; // Hide font labels for other categories
+                        nodeFontColor = 'transparent';
+                        nodeBgColor = isLight ? '#e2e8f0' : '#1e293b';
+                        nodeBorderColor = isLight ? '#f1f5f9' : '#111827';
+                    }
                 }
 
                 nodesArray.push({
@@ -585,6 +600,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             edgeColor = isLight ? '#f1f5f9' : '#111827';
                             edgeWidth = 0.35;
                         }
+                    } else if (activeCategoryFilter !== null) {
+                        if (catId === activeCategoryFilter) {
+                            edgeColor = catMeta.lineColor;
+                            edgeWidth = 1.0;
+                        } else {
+                            edgeColor = isLight ? '#f1f5f9' : '#111827';
+                            edgeWidth = 0.15;
+                        }
                     }
                     
                     edgesArray.push({
@@ -615,6 +638,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             edgeColor = isLight ? '#f1f5f9' : '#111827';
                             edgeWidth = 0.25;
                         }
+                    } else if (activeCategoryFilter !== null) {
+                        if (catId === activeCategoryFilter) {
+                            edgeColor = catMeta.lineColor;
+                            edgeWidth = 0.85;
+                        } else {
+                            edgeColor = isLight ? '#f1f5f9' : '#111827';
+                            edgeWidth = 0.15;
+                        }
                     }
                     
                     edgesArray.push({
@@ -644,6 +675,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else {
                             edgeColor = isLight ? '#f1f5f9' : '#111827';
                             edgeWidth = 0.25;
+                        }
+                    } else if (activeCategoryFilter !== null) {
+                        if (catId === activeCategoryFilter) {
+                            edgeColor = catMeta.lineColor;
+                            edgeWidth = 0.85;
+                        } else {
+                            edgeColor = isLight ? '#f1f5f9' : '#111827';
+                            edgeWidth = 0.15;
                         }
                     }
                     
@@ -681,6 +720,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             } else {
                                 edgeColor = isLight ? '#f1f5f9' : '#111827';
                                 edgeWidth = 0.25;
+                            }
+                        } else if (activeCategoryFilter !== null) {
+                            if (catId === activeCategoryFilter) {
+                                edgeColor = catMeta.color;
+                                edgeWidth = 1.25;
+                            } else {
+                                edgeColor = isLight ? '#f1f5f9' : '#111827';
+                                edgeWidth = 0.15;
                             }
                         }
                         
@@ -772,6 +819,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (typeof nodeId === 'number') {
                         focusedArticleId = nodeId;
                         selectArticle(nodeId, false, true); // Select, but DO NOT switch to Reader View
+                        activeCategoryFilter = null; // Clear legend filter on node select
+                        updateLegendUI();
                         initKnowledgeGraph(articles);
                     } else if (typeof nodeId === 'string' && nodeId.startsWith('cat_')) {
                         focusedArticleId = null;
@@ -779,6 +828,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 } else {
                     focusedArticleId = null;
+                    activeCategoryFilter = null; // Clear legend filter on canvas background click
+                    updateLegendUI();
                     initKnowledgeGraph(articles);
                 }
             });
@@ -913,6 +964,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
+    // ==========================================================================
+    // 🧠 LEGEND INTERACTIVE FILTER CONTROL
+    // ==========================================================================
+    const legendItems = document.querySelectorAll('.legend-item');
+    legendItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const category = item.getAttribute('data-category');
+            if (activeCategoryFilter === category) {
+                activeCategoryFilter = null;
+            } else {
+                activeCategoryFilter = category;
+                focusedArticleId = null; // Clear focused article
+            }
+            updateLegendUI();
+            initKnowledgeGraph(articles);
+        });
+    });
+
+    function updateLegendUI() {
+        const items = document.querySelectorAll('.legend-item');
+        items.forEach(item => {
+            const category = item.getAttribute('data-category');
+            if (activeCategoryFilter === null) {
+                item.classList.remove('active');
+                item.classList.remove('inactive');
+            } else if (category === activeCategoryFilter) {
+                item.classList.add('active');
+                item.classList.remove('inactive');
+            } else {
+                item.classList.remove('active');
+                item.classList.add('inactive');
+            }
+        });
+    }
+
     // Initial theme load
     const initialTheme = localStorage.getItem('drbrooks-theme') || 'dark';
     applyTheme(initialTheme);
