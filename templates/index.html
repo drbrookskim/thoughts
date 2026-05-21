@@ -15,7 +15,7 @@
     <!-- Marked.js for fast client-side markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- Stylesheet -->
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="./static/style.css?v=20260519-v4">
     <script>
         (function() {
             const savedTheme = localStorage.getItem('drbrooks-theme') || 'dark';
@@ -69,53 +69,7 @@
                 </div>
             </div>
 
-            <!-- Scraper Control Panel -->
-            <div class="control-panel">
-                <div class="panel-header" id="toggle-scraper-btn">
-                    <h2><i class="fa-solid fa-gears"></i> 신규 크롤러 구동</h2>
-                    <i class="fa-solid fa-chevron-down toggle-icon"></i>
-                </div>
-                <div class="panel-body hidden" id="scraper-form-container">
-                    <div class="input-group">
-                        <label for="input-author">작가 ID</label>
-                        <div class="input-wrapper">
-                            <span class="input-prefix">@</span>
-                            <input type="text" id="input-author" value="drbrooks" placeholder="작가 ID">
-                        </div>
-                    </div>
-                    <div class="input-row">
-                        <div class="input-group">
-                            <label for="input-start-date">시작 날짜</label>
-                            <input type="date" id="input-start-date" value="2025-12-14">
-                        </div>
-                        <div class="input-group">
-                            <label for="input-end-date">종료 날짜</label>
-                            <input type="date" id="input-end-date">
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label for="input-start-id">시작 글 ID</label>
-                        <input type="number" id="input-start-id" value="164" min="1">
-                    </div>
-                    <button class="btn btn-primary" id="btn-start-scrape">
-                        <i class="fa-solid fa-circle-play"></i> 크롤링 시작
-                    </button>
-                </div>
-            </div>
 
-            <!-- Live Scraping Monitor (Log Console) -->
-            <div class="monitor-panel hidden" id="monitor-panel">
-                <div class="panel-header">
-                    <h2><i class="fa-solid fa-terminal"></i> 실시간 수집 모니터</h2>
-                    <span class="status-badge pulse" id="scraper-status-badge">대기 중</span>
-                </div>
-                <div class="console-wrapper">
-                    <pre class="console" id="console-logs">준비 완료...</pre>
-                </div>
-                <div class="monitor-footer">
-                    <span class="scraped-progress">수집 완료: <strong id="monitor-progress-count">0</strong>개</span>
-                </div>
-            </div>
 
             <!-- Articles List -->
             <div class="articles-list-container">
@@ -147,6 +101,7 @@
                     <div class="tab-group">
                         <button class="tab-btn active" id="tab-reader-btn"><i class="fa-solid fa-book-open"></i> 글보기</button>
                         <button class="tab-btn" id="tab-graph-btn"><i class="fa-solid fa-circle-nodes"></i> 지식 그래프</button>
+                        <button class="tab-btn" id="tab-write-btn"><i class="fa-solid fa-pen-to-square"></i> 글쓰기</button>
                     </div>
                 </div>
                 
@@ -166,13 +121,16 @@
 
             <!-- 1. Obsidian style Knowledge Graph View -->
             <div class="graph-view hidden" id="graph-view-container">
+
                 <div id="graph-canvas"></div>
                 <div class="graph-legend">
-                    <span class="legend-item"><span class="dot philosophy"></span>철학 & 사색</span>
-                    <span class="legend-item"><span class="dot tech"></span>AI & 웹기술</span>
-                    <span class="legend-item"><span class="dot business"></span>기획 & 비즈니스</span>
-                    <span class="legend-item"><span class="dot leadership"></span>소통 & 리더십</span>
-                    <span class="legend-item"><span class="dot society"></span>인간 & 사회</span>
+                    <span class="legend-item" data-category="기획론"><span class="dot planning-theory"></span>기획론</span>
+                    <span class="legend-item" data-category="상품기획"><span class="dot product-planning"></span>상품기획</span>
+                    <span class="legend-item" data-category="AI와 기술"><span class="dot ai-tech"></span>AI와 기술</span>
+                    <span class="legend-item" data-category="인간과 심리"><span class="dot psychology"></span>인간과 심리</span>
+                    <span class="legend-item" data-category="사고와 언어"><span class="dot language"></span>사고와 언어</span>
+                    <span class="legend-item" data-category="관계와 사회"><span class="dot society"></span>관계와 사회</span>
+                    <span class="legend-item" data-category="경제와 가치"><span class="dot value"></span>경제와 가치</span>
                 </div>
             </div>
 
@@ -200,9 +158,6 @@
                         <h1 id="view-title">제목이 여기에 표시됩니다.</h1>
                         <div class="header-links">
                             <span class="file-info" id="view-file-info"><i class="fa-regular fa-file-code"></i> file.md (12KB)</span>
-                            <a href="#" target="_blank" class="btn btn-secondary" id="view-url-btn">
-                                <i class="fa-solid fa-arrow-up-right-from-square"></i> 브런치 원문 가기
-                            </a>
                         </div>
                     </div>
                 </header>
@@ -212,12 +167,106 @@
                     <!-- Rendered markdown html will be injected here -->
                 </section>
             </article>
+
+            <!-- Article Write View -->
+            <div class="write-view hidden" id="write-view">
+                <form id="write-form" onsubmit="event.preventDefault();">
+                    <header class="viewer-header">
+                        <div class="header-meta">
+                            <div class="write-meta-inputs">
+                                <div class="meta-input-item">
+                                    <span class="article-date-badge"><i class="fa-regular fa-calendar"></i> 작성일</span>
+                                    <input type="date" id="write-date" required>
+                                </div>
+                                <div class="meta-input-item">
+                                    <span class="article-category-badge"><i class="fa-solid fa-tags"></i> 카테고리</span>
+                                    <select id="write-category" required>
+                                        <option value="기획론">기획론</option>
+                                        <option value="상품기획">상품기획</option>
+                                        <option value="AI와 기술">AI와 기술</option>
+                                        <option value="인간과 심리">인간과 심리</option>
+                                        <option value="사고와 언어">사고와 언어</option>
+                                        <option value="관계와 사회">관계와 사회</option>
+                                        <option value="경제와 가치">경제와 가치</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <input type="text" id="write-title" placeholder="여기에 제목을 입력하세요" required>
+                        </div>
+                    </header>
+
+                    <section class="viewer-content">
+                        <textarea id="write-content" placeholder="이곳에 내용을 입력하세요..." required></textarea>
+                        
+                        <div class="write-actions">
+                            <div class="password-confirm-group">
+                                <span>비밀번호:</span>
+                                <input type="password" id="write-password" placeholder="관리자 비밀번호" autocomplete="current-password">
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="btn-save-article">
+                                <i class="fa-solid fa-floppy-disk"></i> 저장하기
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="btn-cancel-write">
+                                <i class="fa-solid fa-xmark"></i> 취소
+                            </button>
+                        </div>
+                        <div class="write-helper-note" style="margin-top: 16px; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                            <i class="fa-solid fa-circle-info" style="color: var(--color-primary); margin-right: 4px;"></i>
+                            <strong>로컬 서버 미연동 시 (GitHub Pages 등):</strong> 저장 시 작성된 내용이 마크다운 파일로 다운로드되며, 현재 화면의 목록 및 지식 그래프에 임시 반영됩니다. 영구 저장 및 배포를 원하시면 다운로드된 파일을 <code>brunch_articles/</code> 폴더에 넣고 빌드해 주세요.
+                        </div>
+                    </section>
+                </form>
+            </div>
         </main>
         
     </div>
 
+    <!-- ⚙️ Floating Admin Sync Button -->
+    <button class="fab-sync-btn" id="fab-sync-btn" title="새 글 가져오기 (관리자 전용)">
+        <i class="fa-solid fa-arrows-rotate"></i>
+    </button>
+
+    <!-- 🔒 Admin Sync Modal Dialog -->
+    <div id="admin-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button class="modal-close-btn" id="btn-modal-close" title="닫기"><i class="fa-solid fa-xmark"></i></button>
+            
+            <!-- Modal State 1: Password Input -->
+            <div id="modal-state-password" class="modal-state">
+                <div class="modal-header">
+                    <div class="modal-icon"><i class="fa-solid fa-lock"></i></div>
+                    <h2>관리자 인증</h2>
+                    <p>신규 글을 동기화하여 가져오려면 관리자 비밀번호를 입력해주세요.</p>
+                </div>
+                <form id="admin-password-form" onsubmit="event.preventDefault();">
+                    <div class="password-input-group">
+                        <input type="password" id="admin-password-input" placeholder="비밀번호 입력" required autocomplete="current-password">
+                        <button type="submit" class="btn btn-primary" id="btn-submit-password">확인</button>
+                    </div>
+                    <div class="error-message hidden" id="password-error-msg">비밀번호가 일치하지 않습니다.</div>
+                </form>
+            </div>
+
+            <!-- Modal State 2: Scraping Console Monitor -->
+            <div id="modal-state-console" class="modal-state hidden">
+                <div class="modal-header">
+                    <div class="modal-icon pulse"><i class="fa-solid fa-terminal"></i></div>
+                    <h2>실시간 동기화 모니터</h2>
+                    <p>최신 포스트 수집을 위한 백그라운드 스크래핑이 진행 중입니다.</p>
+                </div>
+                <div class="console-wrapper">
+                    <pre class="console" id="console-logs">수집 시작 대기 중...</pre>
+                </div>
+                <div class="console-footer">
+                    <span class="scraped-progress">수집 완료: <strong id="monitor-progress-count">0</strong>개</span>
+                    <span class="status-badge pulse" id="scraper-status-badge">동기화 중</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript logic -->
-    <script src="/static/app.js"></script>
+    <script src="./static/app.js?v=20260521-v1"></script>
 
     <!-- 🌌 Constellation Particle Network Background Script -->
     <script>

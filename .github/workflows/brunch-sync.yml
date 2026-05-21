@@ -21,16 +21,20 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0 # 💡 동기화 오류를 막기 위해 전체 이력을 가져옵니다.
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          node-version: '24'
+          python-version: '3.11'
 
       - name: Install Dependencies
-        run: npm install axios cheerio
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run Brunch Scraper
-        run: node update-brunch.js
+      - name: Run Scraper and Rebuild Static Site
+        run: |
+          python brunch_scraper.py --start-id 164 --output-dir brunch_articles
+          python build_static.py
 
       - name: Commit and Push if Changed
         run: |

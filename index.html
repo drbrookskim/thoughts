@@ -201,7 +201,7 @@
                         <div class="write-actions">
                             <div class="password-confirm-group">
                                 <span>비밀번호:</span>
-                                <input type="password" id="write-password" placeholder="관리자 비밀번호" required autocomplete="current-password">
+                                <input type="password" id="write-password" placeholder="관리자 비밀번호" autocomplete="current-password">
                             </div>
                             <button type="submit" class="btn btn-primary" id="btn-save-article">
                                 <i class="fa-solid fa-floppy-disk"></i> 저장하기
@@ -209,6 +209,10 @@
                             <button type="button" class="btn btn-secondary" id="btn-cancel-write">
                                 <i class="fa-solid fa-xmark"></i> 취소
                             </button>
+                        </div>
+                        <div class="write-helper-note" style="margin-top: 16px; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                            <i class="fa-solid fa-circle-info" style="color: var(--color-primary); margin-right: 4px;"></i>
+                            <strong>로컬 서버 미연동 시 (GitHub Pages 등):</strong> 저장 시 작성된 내용이 마크다운 파일로 다운로드되며, 현재 화면의 목록 및 지식 그래프에 임시 반영됩니다. 영구 저장 및 배포를 원하시면 다운로드된 파일을 <code>brunch_articles/</code> 폴더에 넣고 빌드해 주세요.
                         </div>
                     </section>
                 </form>

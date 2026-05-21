@@ -90,8 +90,30 @@ class BrunchMarkdownConverter:
         markdown_blocks = []
 
         if content_root:
-            children = content_root.find_all(recursive=False)
-            for child in children:
+            block_elements = []
+            for el in content_root.find_all(True):
+                classes = el.get('class', [])
+                class_str = " ".join(classes) if classes else ""
+                is_block = False
+                if any(k in class_str for k in ["item_type_text", "item_type_title", "item_type_img", "item_type_quote", "item_type_hr"]) or el.name in ['p', 'h1', 'h2', 'h3', 'h4', 'blockquote']:
+                    is_block = True
+                
+                if is_block:
+                    # Check if it has a parent that is also a block element
+                    has_block_parent = False
+                    parent = el.parent
+                    while parent and parent != content_root:
+                        p_classes = parent.get('class', [])
+                        p_class_str = " ".join(p_classes) if p_classes else ""
+                        if any(k in p_class_str for k in ["item_type_text", "item_type_title", "item_type_img", "item_type_quote", "item_type_hr"]) or parent.name in ['p', 'h1', 'h2', 'h3', 'h4', 'blockquote']:
+                            has_block_parent = True
+                            break
+                        parent = parent.parent
+                    
+                    if not has_block_parent:
+                        block_elements.append(el)
+
+            for child in block_elements:
                 classes = child.get('class', [])
                 class_str = " ".join(classes) if classes else ""
 
@@ -287,8 +309,8 @@ def main():
     parser.add_argument(
         "--end-date",
         type=str,
-        default="2026-05-17",
-        help="End date in YYYY-MM-DD format (default: '2026-05-17')"
+        default=datetime.now().strftime("%Y-%m-%d"),
+        help="End date in YYYY-MM-DD format (default: current date)"
     )
     parser.add_argument(
         "--start-id",

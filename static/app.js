@@ -68,11 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check if running in local Flask environment (port 5050)
     const isFlaskEnv = window.location.port === '5050';
 
-    // Hide write tab if not in Flask local mode
-    if (!isFlaskEnv && tabWriteBtn) {
-        tabWriteBtn.style.display = 'none';
-    }
-
     // ==========================================================================
     // 📂 ARTICLE MANAGEMENT & FETCHING
     // ==========================================================================
@@ -187,11 +182,16 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         try {
-            const response = await fetch(`api/article/${id}.json`);
-            const data = await response.json();
+            let data;
+            if (window.localArticleContents && window.localArticleContents[id]) {
+                data = window.localArticleContents[id];
+            } else {
+                const response = await fetch(`api/article/${id}.json`);
+                data = await response.json();
+            }
 
-            if (data.error) {
-                viewContent.innerHTML = `<p style="color: var(--color-error)">[오류] ${data.error}</p>`;
+            if (!data || data.error) {
+                viewContent.innerHTML = `<p style="color: var(--color-error)">[오류] ${data ? data.error : "글을 찾을 수 없습니다."}</p>`;
                 return;
             }
 
@@ -525,6 +525,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function downloadMarkdownFallback(id, title, date, category, content) {
+        const safeTitle = title.replace(/[\/:*?"<>|]/g, '_').trim();
+        const filename = `${id}_${safeTitle}.md`;
+        
+        const fileContent = `# ${title}\n\n- **작성일**: ${date}\n- **카테고리**: ${category}\n\n---\n\n${content}\n`;
+        
+        const blob = new Blob([fileContent], { type: 'text/markdown;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
     if (writeForm) {
         writeForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -540,9 +556,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const btnSave = document.getElementById('btn-save-article');
+            const originalHtml = btnSave ? btnSave.innerHTML : '저장하기';
+
             try {
-                const btnSave = document.getElementById('btn-save-article');
-                const originalHtml = btnSave ? btnSave.innerHTML : '저장하기';
                 if (btnSave) {
                     btnSave.disabled = true;
                     btnSave.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> 저장 중...`;
@@ -561,6 +578,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         password
                     })
                 });
+
+                if (response.status === 404 || response.status === 502 || response.status === 503) {
+                    throw new Error(`Server returned status ${response.status}`);
+                }
 
                 const result = await response.json();
                 
@@ -596,8 +617,64 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
             } catch (error) {
-                console.error("Error saving article:", error);
-                alert(`저장 실패: ${error.message}`);
+                console.warn("API save unavailable, falling back to local file download:", error);
+                
+                if (btnSave) {
+                    btnSave.disabled = false;
+                    btnSave.innerHTML = originalHtml;
+                }
+                
+                // Fallback: Generate custom ID and trigger markdown download
+                const maxId = articles.reduce((max, art) => art.id > max ? art.id : max, 0);
+                const newId = maxId + 1;
+                
+                downloadMarkdownFallback(newId, title, date, category, content);
+                
+                // Construct metadata and content for local-only storage
+                const safeTitle = title.replace(/[\/:*?"<>|]/g, '_').trim();
+                const filename = `${newId}_${safeTitle}.md`;
+                const sizeKb = Math.round((content.length * 2) / 1024 * 10) / 10;
+                
+                const localArticleMeta = {
+                    id: newId,
+                    title: title,
+                    date: date,
+                    url: "",
+                    filename: filename,
+                    size_kb: sizeKb,
+                    category: category
+                };
+                
+                // Add to client memory
+                articles.unshift(localArticleMeta);
+                articles.sort((a, b) => b.id - a.id);
+                
+                if (!window.localArticleContents) {
+                    window.localArticleContents = {};
+                }
+                window.localArticleContents[newId] = {
+                    id: newId,
+                    title: title,
+                    date: date,
+                    url: "",
+                    filename: filename,
+                    size_kb: sizeKb,
+                    category: category,
+                    content: `# ${title}\n\n- **작성일**: ${date}\n- **카테고리**: ${category}\n\n---\n\n${content}`
+                };
+                
+                // Re-render
+                renderArticlesList(articles);
+                updateStats();
+                
+                alert(`[안내] 로컬 서버가 연동되지 않았습니다.\n작성한 글이 '${filename}' 파일로 다운로드되었습니다.\n(현재 웹 브라우저 화면의 목록 및 지식 그래프에 반영되었습니다.)`);
+                
+                if (writeTitle) writeTitle.value = '';
+                if (writeContent) writeContent.value = '';
+                if (writePassword) writePassword.value = '';
+                
+                // Open and view it
+                await selectArticle(newId, true, true);
             }
         });
     }
