@@ -101,6 +101,7 @@
                     <div class="tab-group">
                         <button class="tab-btn active" id="tab-reader-btn"><i class="fa-solid fa-book-open"></i> 글보기</button>
                         <button class="tab-btn" id="tab-graph-btn"><i class="fa-solid fa-circle-nodes"></i> 지식 그래프</button>
+                        <button class="tab-btn" id="tab-write-btn"><i class="fa-solid fa-pen-to-square"></i> 글쓰기</button>
                     </div>
                 </div>
                 
@@ -157,9 +158,6 @@
                         <h1 id="view-title">제목이 여기에 표시됩니다.</h1>
                         <div class="header-links">
                             <span class="file-info" id="view-file-info"><i class="fa-regular fa-file-code"></i> file.md (12KB)</span>
-                            <a href="#" target="_blank" class="btn btn-secondary" id="view-url-btn">
-                                <i class="fa-solid fa-arrow-up-right-from-square"></i> 브런치 원문 가기
-                            </a>
                         </div>
                     </div>
                 </header>
@@ -169,6 +167,52 @@
                     <!-- Rendered markdown html will be injected here -->
                 </section>
             </article>
+
+            <!-- Article Write View -->
+            <div class="write-view hidden" id="write-view">
+                <form id="write-form" onsubmit="event.preventDefault();">
+                    <header class="viewer-header">
+                        <div class="header-meta">
+                            <div class="write-meta-inputs">
+                                <div class="meta-input-item">
+                                    <span class="article-date-badge"><i class="fa-regular fa-calendar"></i> 작성일</span>
+                                    <input type="date" id="write-date" required>
+                                </div>
+                                <div class="meta-input-item">
+                                    <span class="article-category-badge"><i class="fa-solid fa-tags"></i> 카테고리</span>
+                                    <select id="write-category" required>
+                                        <option value="기획론">기획론</option>
+                                        <option value="상품기획">상품기획</option>
+                                        <option value="AI와 기술">AI와 기술</option>
+                                        <option value="인간과 심리">인간과 심리</option>
+                                        <option value="사고와 언어">사고와 언어</option>
+                                        <option value="관계와 사회">관계와 사회</option>
+                                        <option value="경제와 가치">경제와 가치</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <input type="text" id="write-title" placeholder="여기에 제목을 입력하세요" required>
+                        </div>
+                    </header>
+
+                    <section class="viewer-content">
+                        <textarea id="write-content" placeholder="이곳에 내용을 입력하세요..." required></textarea>
+                        
+                        <div class="write-actions">
+                            <div class="password-confirm-group">
+                                <span>비밀번호:</span>
+                                <input type="password" id="write-password" placeholder="관리자 비밀번호" required autocomplete="current-password">
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="btn-save-article">
+                                <i class="fa-solid fa-floppy-disk"></i> 저장하기
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="btn-cancel-write">
+                                <i class="fa-solid fa-xmark"></i> 취소
+                            </button>
+                        </div>
+                    </section>
+                </form>
+            </div>
         </main>
         
     </div>

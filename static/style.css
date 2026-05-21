@@ -1360,6 +1360,15 @@ body.theme-light .graph-legend {
     border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
+/* Light mode overrides for legend category dots to improve contrast */
+body.theme-light .dot.planning-theory { background-color: #6d5b97; box-shadow: 0 0 8px rgba(109, 91, 151, 0.4); }
+body.theme-light .dot.product-planning { background-color: #a07800; box-shadow: 0 0 8px rgba(160, 120, 0, 0.4); }
+body.theme-light .dot.ai-tech { background-color: #007d85; box-shadow: 0 0 8px rgba(0, 125, 133, 0.4); }
+body.theme-light .dot.psychology { background-color: #c42d4f; box-shadow: 0 0 8px rgba(196, 45, 79, 0.4); }
+body.theme-light .dot.language { background-color: #b86200; box-shadow: 0 0 8px rgba(184, 98, 0, 0.4); }
+body.theme-light .dot.society { background-color: #0060ad; box-shadow: 0 0 8px rgba(0, 96, 173, 0.4); }
+body.theme-light .dot.value { background-color: #1b7a43; box-shadow: 0 0 8px rgba(27, 122, 67, 0.4); }
+
 body.theme-light .welcome-view {
     background: var(--bg-base);
 }
@@ -1704,4 +1713,220 @@ body.theme-light .console-footer {
     0%, 100% { transform: translateX(0); }
     20%, 60% { transform: translateX(-8px); }
     40%, 80% { transform: translateX(8px); }
+}
+
+
+/* ==========================================================================
+   ✍️ WRITE VIEW STYLING (PREMIUM GLASSMORPHIC EDITOR)
+   ========================================================================== */
+
+.write-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.write-view.hidden {
+    display: none;
+}
+
+#write-form {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+}
+
+.write-meta-inputs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.meta-input-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 6px 14px;
+    transition: var(--transition-smooth);
+}
+
+body.theme-light .meta-input-item {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.meta-input-item:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 10px var(--border-glow);
+}
+
+.meta-input-item span {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.meta-input-item input[type="date"],
+.meta-input-item select {
+    background: transparent;
+    border: none;
+    padding: 4px 6px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+}
+
+.meta-input-item input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8);
+    cursor: pointer;
+}
+
+body.theme-light .meta-input-item input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.2);
+}
+
+#write-title {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--border-light);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 32px;
+    font-weight: 700;
+    padding: 12px 0;
+    outline: none;
+    transition: var(--transition-smooth);
+    letter-spacing: -0.5px;
+}
+
+#write-title:focus {
+    border-color: var(--color-primary);
+}
+
+#write-title::placeholder {
+    color: var(--text-tertiary);
+    font-weight: 600;
+}
+
+.write-view .viewer-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 32px;
+    gap: 20px;
+    overflow-y: auto;
+}
+
+#write-content {
+    flex: 1;
+    min-height: 300px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 24px;
+    color: var(--text-primary);
+    font-family: 'Fira Code', Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+    font-size: 14.5px;
+    line-height: 1.7;
+    resize: none;
+    outline: none;
+    transition: var(--transition-smooth);
+}
+
+#write-content:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 15px var(--border-glow);
+}
+
+#write-content::placeholder {
+    color: var(--text-tertiary);
+}
+
+.write-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 20px 0;
+    border-top: 1px solid var(--border-light);
+    margin-top: auto;
+}
+
+.password-confirm-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: auto;
+}
+
+.password-confirm-group span {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+#write-password {
+    background: var(--bg-input);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    width: 180px;
+    outline: none;
+    transition: var(--transition-smooth);
+}
+
+#write-password:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 10px var(--border-glow);
+}
+
+#write-password::placeholder {
+    color: var(--text-tertiary);
+}
+
+@media (max-width: 768px) {
+    .write-view .viewer-content {
+        padding: 20px 16px;
+    }
+    
+    .write-meta-inputs {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .meta-input-item {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .write-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    
+    .password-confirm-group {
+        margin-right: 0;
+        justify-content: space-between;
+    }
+    
+    #write-password {
+        width: 60%;
+    }
 }

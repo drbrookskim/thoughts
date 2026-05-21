@@ -12,6 +12,7 @@ def parse_markdown_metadata(filepath):
     title = "제목 없음"
     date_str = "N/A"
     url = ""
+    category = None
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             lines = f.readlines()[:10]
@@ -28,9 +29,12 @@ def parse_markdown_metadata(filepath):
         url_match = re.search(r'원문 주소\*\*:?\s*([^\s\n\r]+)', content_snippet)
         if url_match:
             url = url_match.group(1)
+        category_match = re.search(r'카테고리\*\*:?\s*([^\n\r]+)', content_snippet)
+        if category_match:
+            category = category_match.group(1).strip()
     except Exception as e:
         print(f"Error parsing metadata for {filepath}: {e}")
-    return title, date_str, url
+    return title, date_str, url, category
 
 def classify_article(filename, title):
     t = (filename + " " + title).lower()
@@ -95,10 +99,11 @@ for filename in os.listdir(ARTICLES_DIR):
     try:
         id_part = filename.split('_')[0]
         article_id = int(id_part)
-        title, date_str, url = parse_markdown_metadata(filepath)
+        title, date_str, url, category = parse_markdown_metadata(filepath)
         size_kb = round(os.path.getsize(filepath) / 1024, 1)
         
-        category = classify_article(filename, title)
+        if not category:
+            category = classify_article(filename, title)
         
         item_meta = {
             "id": article_id,

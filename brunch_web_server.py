@@ -24,11 +24,12 @@ scraper_status = {
 
 def parse_markdown_metadata(filepath):
     """
-    Parses title, date, and url from a saved markdown file header.
+    Parses title, date, url, and category from a saved markdown file header.
     """
     title = "제목 없음"
     date_str = "N/A"
     url = ""
+    category = None
     
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -55,10 +56,16 @@ def parse_markdown_metadata(filepath):
         if url_match:
             url = url_match.group(1)
             
+        # Parse category (- **카테고리**: category)
+        category_match = re.search(r'카테고리\*\*:?\s*([^\n\r]+)', content_snippet)
+        if category_match:
+            category = category_match.group(1).strip()
+            
     except Exception as e:
         print(f"Error parsing metadata for {filepath}: {e}")
         
-    return title, date_str, url
+    return title, date_str, url, category
+
 
 def classify_article(filename, title):
     t = (filename + " " + title).lower()
@@ -318,8 +325,9 @@ def get_articles():
             match = re.match(r'^(\d+)_', filename)
             article_id = int(match.group(1)) if match else 0
             
-            title, date_str, url = parse_markdown_metadata(filepath)
-            category = classify_article(filename, title)
+            title, date_str, url, category = parse_markdown_metadata(filepath)
+            if not category:
+                category = classify_article(filename, title)
             
             articles.append({
                 "id": article_id,
@@ -358,8 +366,9 @@ def get_article_content(article_id):
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
-        title, date_str, url = parse_markdown_metadata(filepath)
-        category = classify_article(target_filename, title)
+        title, date_str, url, category = parse_markdown_metadata(filepath)
+        if not category:
+            category = classify_article(target_filename, title)
         return jsonify({
             "id": article_id,
             "title": title,
@@ -439,6 +448,69 @@ def get_scraping_status():
     return jsonify(scraper_status)
 
 
+@app.route('/api/article', methods=['POST'])
+def save_article():
+    """
+    Saves a new article as a markdown file, then regenerates static files.
+    """
+    data = request.json or {}
+    password = data.get("password")
+    
+    if password != ADMIN_PASSWORD:
+        return jsonify({"error": "비밀번호가 올바르지 않습니다."}), 401
+        
+    title = data.get("title", "").strip()
+    date_str = data.get("date", "").strip()
+    category = data.get("category", "").strip()
+    content = data.get("content", "").strip()
+    
+    if not title or not content:
+        return jsonify({"error": "제목과 본문은 필수 입력 사항입니다."}), 400
+        
+    # Generate new ID
+    new_id = get_latest_local_id() + 1
+    
+    # Clean filename
+    safe_title = re.sub(r'[\/:*?"<>|]', '_', title).strip()
+    filename = f"{new_id}_{safe_title}.md"
+    filepath = os.path.join(ARTICLES_DIR, filename)
+    
+    # Format markdown (URL is omitted)
+    meta_header = f"# {title}\n\n- **작성일**: {date_str}\n"
+    if category:
+        meta_header += f"- **카테고리**: {category}\n"
+    meta_header += "\n---\n"
+    
+    full_content = f"{meta_header}\n{content}\n"
+    # Normalize double newlines
+    full_content = re.sub(r'\n{3,}', '\n\n', full_content)
+    
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(full_content)
+            
+        # Rebuild static files
+        import subprocess
+        import sys
+        try:
+            res = subprocess.run([sys.executable, "build_static.py"], capture_output=True, text=True)
+            if res.returncode != 0:
+                print(f"Error rebuilding static files: {res.stderr}")
+        except Exception as build_err:
+            print(f"Failed to execute build_static.py: {build_err}")
+            
+        return jsonify({
+            "success": True,
+            "id": new_id,
+            "filename": filename,
+            "message": "성공적으로 저장되었습니다."
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"파일 저장 중 오류 발생: {e}"}), 500
+
+
 if __name__ == '__main__':
     print("[*] Starting Brunch Scraper Web App on http://127.0.0.1:5050 ...")
     app.run(host='127.0.0.1', port=5050, debug=True)
+

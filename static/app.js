@@ -49,7 +49,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tab and Graph View DOM Elements
     const tabGraphBtn = document.getElementById('tab-graph-btn');
     const tabReaderBtn = document.getElementById('tab-reader-btn');
+    const tabWriteBtn = document.getElementById('tab-write-btn');
     const graphViewContainer = document.getElementById('graph-view-container');
+    const writeView = document.getElementById('write-view');
+    const writeForm = document.getElementById('write-form');
+    const writeDate = document.getElementById('write-date');
+    const writeCategory = document.getElementById('write-category');
+    const writeTitle = document.getElementById('write-title');
+    const writeContent = document.getElementById('write-content');
+    const writePassword = document.getElementById('write-password');
+    const btnCancelWrite = document.getElementById('btn-cancel-write');
+
     let networkInstance = null; // vis.js network instance
     let nodesDataset = null;
     let edgesDataset = null;
@@ -57,6 +67,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check if running in local Flask environment (port 5050)
     const isFlaskEnv = window.location.port === '5050';
+
+    // Hide write tab if not in Flask local mode
+    if (!isFlaskEnv && tabWriteBtn) {
+        tabWriteBtn.style.display = 'none';
+    }
 
     // ==========================================================================
     // 📂 ARTICLE MANAGEMENT & FETCHING
@@ -122,10 +137,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Select an article and render its markdown content
     async function selectArticle(id, shouldSwitchTab = true, syncGraphFocus = true) {
         // Automatically switch to reader tab if requested
-        if (shouldSwitchTab && tabGraphBtn.classList.contains('active')) {
+        if (shouldSwitchTab && (tabGraphBtn.classList.contains('active') || (tabWriteBtn && tabWriteBtn.classList.contains('active')))) {
             tabReaderBtn.classList.add('active');
             tabGraphBtn.classList.remove('active');
+            if (tabWriteBtn) tabWriteBtn.classList.remove('active');
             graphViewContainer.classList.add('hidden');
+            if (writeView) writeView.classList.add('hidden');
         }
 
         // Toggle active classes in list
@@ -161,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
         viewTitle.textContent = "불러오는 중...";
         viewDate.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> 로딩 중`;
         viewFileInfo.innerHTML = '';
-        viewUrlBtn.classList.add('hidden');
+        if (viewUrlBtn) viewUrlBtn.classList.add('hidden');
         viewContent.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 300px; color: var(--text-secondary); gap: 16px;">
                 <i class="fa-solid fa-spinner fa-spin fa-2x" style="color: var(--color-primary)"></i>
@@ -187,10 +204,12 @@ document.addEventListener('DOMContentLoaded', () => {
             viewFileInfo.innerHTML = `<i class="fa-regular fa-file-code"></i> ${data.filename} (${articleMeta ? articleMeta.size_kb : 0} KB)`;
             
             if (articleMeta && articleMeta.url) {
-                viewUrlBtn.href = articleMeta.url;
-                viewUrlBtn.classList.remove('hidden');
+                if (viewUrlBtn) {
+                    viewUrlBtn.href = articleMeta.url;
+                    viewUrlBtn.classList.remove('hidden');
+                }
             } else {
-                viewUrlBtn.classList.add('hidden');
+                if (viewUrlBtn) viewUrlBtn.classList.add('hidden');
             }
 
             // Clean headers and render Markdown content
@@ -430,9 +449,11 @@ document.addEventListener('DOMContentLoaded', () => {
     tabGraphBtn.addEventListener('click', () => {
         tabGraphBtn.classList.add('active');
         tabReaderBtn.classList.remove('active');
+        if (tabWriteBtn) tabWriteBtn.classList.remove('active');
         graphViewContainer.classList.remove('hidden');
         welcomeView.classList.add('hidden');
         articleView.classList.add('hidden');
+        if (writeView) writeView.classList.add('hidden');
 
         // Always re-initialize the graph to reflect any new article selection focus
         initKnowledgeGraph(articles);
@@ -449,7 +470,9 @@ document.addEventListener('DOMContentLoaded', () => {
     tabReaderBtn.addEventListener('click', () => {
         tabReaderBtn.classList.add('active');
         tabGraphBtn.classList.remove('active');
+        if (tabWriteBtn) tabWriteBtn.classList.remove('active');
         graphViewContainer.classList.add('hidden');
+        if (writeView) writeView.classList.add('hidden');
         
         if (activeArticleId) {
             articleView.classList.remove('hidden');
@@ -459,6 +482,125 @@ document.addEventListener('DOMContentLoaded', () => {
             articleView.classList.add('hidden');
         }
     });
+
+    if (tabWriteBtn) {
+        tabWriteBtn.addEventListener('click', () => {
+            tabWriteBtn.classList.add('active');
+            tabGraphBtn.classList.remove('active');
+            tabReaderBtn.classList.remove('active');
+            
+            graphViewContainer.classList.add('hidden');
+            welcomeView.classList.add('hidden');
+            articleView.classList.add('hidden');
+            if (writeView) writeView.classList.remove('hidden');
+
+            // Reset fields
+            if (writeTitle) writeTitle.value = '';
+            if (writeContent) writeContent.value = '';
+            
+            // Set current date in YYYY-MM-DD
+            if (writeDate) {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                writeDate.value = `${year}-${month}-${day}`;
+            }
+
+            // Restore password from sessionStorage if available
+            if (writePassword) {
+                writePassword.value = sessionStorage.getItem('admin_password') || '';
+            }
+            
+            // Focus on title
+            if (writeTitle) {
+                setTimeout(() => writeTitle.focus(), 100);
+            }
+        });
+    }
+
+    if (btnCancelWrite) {
+        btnCancelWrite.addEventListener('click', () => {
+            tabReaderBtn.click();
+        });
+    }
+
+    if (writeForm) {
+        writeForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const title = writeTitle.value.trim();
+            const date = writeDate.value;
+            const category = writeCategory.value;
+            const content = writeContent.value.trim();
+            const password = writePassword.value;
+
+            if (!title || !content) {
+                alert("제목과 본문을 입력해주세요.");
+                return;
+            }
+
+            try {
+                const btnSave = document.getElementById('btn-save-article');
+                const originalHtml = btnSave ? btnSave.innerHTML : '저장하기';
+                if (btnSave) {
+                    btnSave.disabled = true;
+                    btnSave.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> 저장 중...`;
+                }
+
+                const response = await fetch('/api/article', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title,
+                        date,
+                        category,
+                        content,
+                        password
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (btnSave) {
+                    btnSave.disabled = false;
+                    btnSave.innerHTML = originalHtml;
+                }
+
+                if (response.status === 401 || result.error) {
+                    const actionsEl = document.querySelector('.write-actions');
+                    if (actionsEl) {
+                        actionsEl.classList.add('shake');
+                        setTimeout(() => actionsEl.classList.remove('shake'), 400);
+                    }
+                    alert(result.error || "비밀번호가 올바르지 않습니다.");
+                    if (writePassword) writePassword.focus();
+                    return;
+                }
+
+                // Success! Save password in sessionStorage
+                sessionStorage.setItem('admin_password', password);
+                
+                if (writeTitle) writeTitle.value = '';
+                if (writeContent) writeContent.value = '';
+                if (writePassword) writePassword.value = '';
+
+                // Reload the article list
+                await loadArticles();
+
+                // Select and open the new article
+                if (result.id) {
+                    await selectArticle(result.id, true, true);
+                }
+
+            } catch (error) {
+                console.error("Error saving article:", error);
+                alert(`저장 실패: ${error.message}`);
+            }
+        });
+    }
 
     // ==========================================================================
     // 🧠 OBSIDIAN KNOWLEDGE GRAPH VIEW ENGINE
@@ -478,13 +620,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 1. Curated 7-Category Metadata Definition
         const categories = {
-            "기획론": { label: "기획론", color: "#a18cd1", lineColor: "#504668", labelColorLight: "#4a3b6c", shadow: "rgba(161, 140, 209, 0.2)" },
-            "상품기획": { label: "상품기획", color: "#fbd043", lineColor: "#7d6821", labelColorLight: "#6a520d", shadow: "rgba(251, 208, 67, 0.2)" },
-            "AI와 기술": { label: "AI와 기술", color: "#00f2fe", lineColor: "#00797f", labelColorLight: "#006266", shadow: "rgba(0, 242, 254, 0.2)" },
-            "인간과 심리": { label: "인간과 심리", color: "#ff6b8b", lineColor: "#803545", labelColorLight: "#782538", shadow: "rgba(255, 107, 139, 0.2)" },
-            "사고와 언어": { label: "사고와 언어", color: "#ff9f43", lineColor: "#805022", labelColorLight: "#78440d", shadow: "rgba(255, 159, 67, 0.2)" },
-            "관계와 사회": { label: "관계와 사회", color: "#4facfe", lineColor: "#27567f", labelColorLight: "#184e77", shadow: "rgba(79, 172, 254, 0.2)" },
-            "경제와 가치": { label: "경제와 가치", color: "#2ecc71", lineColor: "#176638", labelColorLight: "#135c32", shadow: "rgba(46, 204, 113, 0.2)" }
+            "기획론": { label: "기획론", color: "#a18cd1", colorLight: "#6d5b97", lineColor: "#504668", labelColorLight: "#4a3b6c", shadow: "rgba(161, 140, 209, 0.2)" },
+            "상품기획": { label: "상품기획", color: "#fbd043", colorLight: "#a07800", lineColor: "#7d6821", labelColorLight: "#6a520d", shadow: "rgba(251, 208, 67, 0.2)" },
+            "AI와 기술": { label: "AI와 기술", color: "#00f2fe", colorLight: "#007d85", lineColor: "#00797f", labelColorLight: "#006266", shadow: "rgba(0, 242, 254, 0.2)" },
+            "인간과 심리": { label: "인간과 심리", color: "#ff6b8b", colorLight: "#c42d4f", lineColor: "#803545", labelColorLight: "#782538", shadow: "rgba(255, 107, 139, 0.2)" },
+            "사고와 언어": { label: "사고와 언어", color: "#ff9f43", colorLight: "#b86200", lineColor: "#805022", labelColorLight: "#78440d", shadow: "rgba(255, 159, 67, 0.2)" },
+            "관계와 사회": { label: "관계와 사회", color: "#4facfe", colorLight: "#0060ad", lineColor: "#27567f", labelColorLight: "#184e77", shadow: "rgba(79, 172, 254, 0.2)" },
+            "경제와 가치": { label: "경제와 가치", color: "#2ecc71", colorLight: "#1b7a43", lineColor: "#176638", labelColorLight: "#135c32", shadow: "rgba(46, 204, 113, 0.2)" }
         };
 
         const nodesArray = [];
@@ -515,6 +657,7 @@ document.addEventListener('DOMContentLoaded', () => {
         items.forEach(article => {
             const catId = article.category || "기획론";
             const catMeta = categories[catId] || categories["기획론"];
+            const catColor = isLight ? catMeta.colorLight : catMeta.color;
             const isFocused = (article.id === focusedArticleId);
             const isSameCat = (catId === focusedCatId);
 
@@ -525,14 +668,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     label: article.title, // Full title without truncation for absolute focus
                     title: `[현재 메인 글]\n${article.title}\n(분야: ${catId} | 작성일: ${article.date})`,
                     color: {
-                        background: catMeta.color, // Neon glow core matching the category
+                        background: catColor, // Neon glow core matching the category
                         border: isLight ? '#0f172a' : '#ffffff',
                         highlight: {
-                            background: catMeta.color,
+                            background: catColor,
                             border: isLight ? '#0f172a' : '#ffffff'
                         },
                         hover: {
-                            background: catMeta.color,
+                            background: catColor,
                             border: isLight ? '#0f172a' : '#ffffff'
                         }
                     },
@@ -551,8 +694,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 let nodeSize = 3.0;
                 let nodeFontSize = 10;
                 let nodeFontColor = artFontColor;
-                let nodeBgColor = catMeta.color; // Premium Category Glow by default!
-                let nodeBorderColor = catMeta.color;
+                let nodeBgColor = catColor; // Premium Category Glow by default!
+                let nodeBorderColor = catColor;
 
                 // Focus styling optimization
                 if (focusedArticleId !== null) {
@@ -560,7 +703,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         nodeSize = 4.0; // Sibling articles clustered beautifully
                         nodeFontSize = 11;
                         nodeFontColor = isLight ? catMeta.labelColorLight : catMeta.color; // Highlight color (darker on light theme)
-                        nodeBorderColor = catMeta.color;
+                        nodeBorderColor = catColor;
                     } else {
                         nodeSize = 2.0; // Shrink unrelated articles
                         nodeFontSize = 8;
@@ -574,7 +717,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         nodeSize = 4.0; // Highlight selected category articles
                         nodeFontSize = 11;
                         nodeFontColor = isLight ? catMeta.labelColorLight : catMeta.color; // Highlight color (darker on light theme)
-                        nodeBorderColor = catMeta.color;
+                        nodeBorderColor = catColor;
                     } else {
                         nodeSize = 1.5; // Highly shrink other articles
                         nodeFontSize = 0; // Hide font labels for other categories
@@ -593,11 +736,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         border: nodeBorderColor,
                         highlight: {
                             background: artBgHover,
-                            border: catMeta.color
+                            border: catColor
                         },
                         hover: {
                             background: artBgHover,
-                            border: catMeta.color
+                            border: catColor
                         }
                     },
                     size: nodeSize,
@@ -609,6 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add Organic Intra-Category Connections (Obsidian Cluster Architecture)
         Object.entries(articlesByCategory).forEach(([catId, catArticles]) => {
             const catMeta = categories[catId];
+            const catColor = isLight ? catMeta.colorLight : catMeta.color;
             
             // Sort articles chronologically/numerically to form a clean logical spine
             catArticles.sort((a, b) => a.id - b.id);
@@ -649,8 +793,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         width: edgeWidth,
                         color: {
                             color: edgeColor,
-                            highlight: catMeta.color,
-                            hover: catMeta.color
+                            highlight: catColor,
+                            hover: catColor
                         }
                     });
                 }
@@ -687,8 +831,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         width: edgeWidth,
                         color: {
                             color: edgeColor,
-                            highlight: catMeta.color,
-                            hover: catMeta.color
+                            highlight: catColor,
+                            hover: catColor
                         }
                     });
                 }
@@ -725,8 +869,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         width: edgeWidth,
                         color: {
                             color: edgeColor,
-                            highlight: catMeta.color,
-                            hover: catMeta.color
+                            highlight: catColor,
+                            hover: catColor
                         }
                     });
                 }
@@ -746,7 +890,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         if (focusedArticleId !== null) {
                             if (isSameCat) {
-                                edgeColor = catMeta.color;
+                                edgeColor = catColor;
                                 edgeWidth = 1.25;
                             } else {
                                 edgeColor = isLight ? '#f1f5f9' : '#111827';
@@ -754,7 +898,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         } else if (activeCategoryFilter !== null) {
                             if (catId === activeCategoryFilter) {
-                                edgeColor = catMeta.color;
+                                edgeColor = catColor;
                                 edgeWidth = 1.25;
                             } else {
                                 edgeColor = isLight ? '#f1f5f9' : '#111827';
@@ -770,8 +914,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             width: edgeWidth,
                             color: {
                                 color: edgeColor,
-                                highlight: catMeta.color,
-                                hover: catMeta.color
+                                highlight: catColor,
+                                hover: catColor
                             }
                         });
                         break; // Connect to at most one semantic partner to avoid visual clutter
@@ -900,7 +1044,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         try {
-            const author = inputAuthor.value.trim() || 'drbrooks';
+            const author = 'drbrooks';
             const response = await fetch(`/api/check_new?author=${author}`);
             const result = await response.json();
             
