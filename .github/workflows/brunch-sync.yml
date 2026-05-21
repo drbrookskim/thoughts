@@ -5,7 +5,6 @@ on:
     - cron: '0 * * * *'
   workflow_dispatch:
 
-# 💡 로그에 찍힌 안내대로 Node 24 환경을 강제하여 경고 메시지를 완전히 제거합니다.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
@@ -26,8 +25,10 @@ jobs:
         with:
           node-version: '24'
 
+      # 💡 버전 고정 대신 일반 설치로 변경하여 설치 실패 확률을 없앱니다.
+      # (NPM이 악성 버전을 이미 폐기했으므로 최신 버전은 안전합니다.)
       - name: Install Dependencies
-        run: npm install axios@1.15.1 cheerio@1.0.0-rc.12
+        run: npm install axios cheerio
 
       - name: Run Brunch Scraper
         run: node update-brunch.js
@@ -37,10 +38,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 💡 [핵심 변경] 특정 폴더 지정 대신 전체 경로('.')를 지정합니다.
-          # 이렇게 하면 새 글이 없어서 폴더가 비어있어도 128 에러를 내지 않고 유연하게 넘어갑니다.
           git add .
-          
           if ! git diff --cached --quiet; then
             git commit -m "chore: 브런치 새 글 자동 동기화"
             git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" main
