@@ -1,0 +1,42 @@
+name: Sync Brunch Posts
+
+on:
+  schedule:
+    - cron: '0 * * * *' # 매 시간 정각에 자동으로 실행 (UTC 기준)
+  workflow_dispatch: # 필요할 때 깃허브 웹에서 수동으로 실행 가능
+
+permissions:
+  contents: write # 레포지토리에 새 마크다운 파일을 푸시하기 위한 권한 최소화 지정
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 💡 보안 패치가 완료된 안전한 Axios 버전 명시
+      - name: Install Dependencies
+        run: npm install axios@1.15.1 cheerio@1.0.0-rc.12
+
+      - name: Run Brunch Scraper
+        run: node update-brunch.js
+
+      - name: Commit and Push if Changed
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # thoughts 폴더에 변경사항이 있는지 확인
+          git add thoughts/
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: 브런치 새 글 자동 동기화"
+            git push
+          else
+            echo "새로 등록된 글이 없습니다."
+          fi
