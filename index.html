@@ -15,16 +15,16 @@
     <!-- Marked.js for fast client-side markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- Stylesheet -->
-    <link rel="stylesheet" href="./static/style.css?v=20260519-v4">
+    <link rel="stylesheet" href="./static/style.css?v=20260729-lovable-v2">
     <script>
         (function() {
-            const savedTheme = localStorage.getItem('drbrooks-theme') || 'dark';
-            if (savedTheme === 'light') {
-                document.documentElement.classList.add('theme-light');
+            const savedTheme = localStorage.getItem('drbrooks-theme') || 'light';
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('theme-dark');
             } else if (savedTheme === 'system') {
                 const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                if (!systemPrefersDark) {
-                    document.documentElement.classList.add('theme-light');
+                if (systemPrefersDark) {
+                    document.documentElement.classList.add('theme-dark');
                 }
             }
         })();
@@ -106,10 +106,10 @@
                 
                 <!-- 🌓 Premium Theme Switcher Segment -->
                 <div class="theme-switcher">
-                    <button class="theme-btn" data-theme="light" title="라이트 모드">
+                    <button class="theme-btn active" data-theme="light" title="라이트 모드 (Lovable Parchment)">
                         <i class="fa-solid fa-sun"></i>
                     </button>
-                    <button class="theme-btn active" data-theme="dark" title="다크 모드">
+                    <button class="theme-btn" data-theme="dark" title="다크 모드">
                         <i class="fa-solid fa-moon"></i>
                     </button>
                     <button class="theme-btn" data-theme="system" title="기기 설정">
@@ -265,7 +265,7 @@
     </div>
 
     <!-- JavaScript logic -->
-    <script src="./static/app.js?v=20260521-v1"></script>
+    <script src="./static/app.js?v=20260729-lovable-v2"></script>
 
     <!-- 🌌 Constellation Particle Network Background Script -->
     <script>

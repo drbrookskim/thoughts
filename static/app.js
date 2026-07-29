@@ -686,14 +686,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('graph-canvas');
         if (!container) return;
         
-        const isLight = document.documentElement.classList.contains('theme-light');
-        const catFontColor = isLight ? '#0f172a' : '#e4e4e7';
-        const catBg = isLight ? '#ffffff' : '#1e1e1e';
-        const catBgHighlight = isLight ? '#f1f5f9' : '#2d2d2d';
-        const artFontColor = isLight ? '#1e293b' : '#e4e4e7';
-        const artBg = isLight ? '#64748b' : '#a1a1aa';
-        const artBgHover = isLight ? '#94a3b8' : '#d4d4d8';
-        const edgeBase = isLight ? '#475569' : '#27272a';
+        const isDark = document.documentElement.classList.contains('theme-dark');
+        const isLight = !isDark;
+        const catFontColor = isLight ? '#1c1c1c' : '#f7f4ed';
+        const catBg = isLight ? '#f7f4ed' : '#1c1c1b';
+        const catBgHighlight = isLight ? '#eceae4' : '#262624';
+        const artFontColor = isLight ? '#1c1c1c' : '#f7f4ed';
+        const artBg = isLight ? '#5f5f5d' : '#a1a19e';
+        const artBgHover = isLight ? '#1c1c1c' : '#f7f4ed';
+        const edgeBase = isLight ? '#eceae4' : '#282826';
 
         // 1. Curated 7-Category Metadata Definition
         const categories = {
@@ -1162,21 +1163,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (theme === 'system') {
             const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             if (systemPrefersDark) {
-                document.body.classList.remove('theme-light');
-                document.documentElement.classList.remove('theme-light');
+                document.body.classList.add('theme-dark');
+                document.documentElement.classList.add('theme-dark');
             } else {
-                document.body.classList.add('theme-light');
-                document.documentElement.classList.add('theme-light');
+                document.body.classList.remove('theme-dark');
+                document.documentElement.classList.remove('theme-dark');
             }
             localStorage.setItem('drbrooks-theme', 'system');
-        } else if (theme === 'light') {
-            document.body.classList.add('theme-light');
-            document.documentElement.classList.add('theme-light');
-            localStorage.setItem('drbrooks-theme', 'light');
-        } else {
-            document.body.classList.remove('theme-light');
-            document.documentElement.classList.remove('theme-light');
+        } else if (theme === 'dark') {
+            document.body.classList.add('theme-dark');
+            document.documentElement.classList.add('theme-dark');
             localStorage.setItem('drbrooks-theme', 'dark');
+        } else {
+            document.body.classList.remove('theme-dark');
+            document.documentElement.classList.remove('theme-dark');
+            localStorage.setItem('drbrooks-theme', 'light');
         }
         
         // Refresh knowledge graph with new theme colors
@@ -1193,7 +1194,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-        const savedTheme = localStorage.getItem('drbrooks-theme') || 'dark';
+        const savedTheme = localStorage.getItem('drbrooks-theme') || 'light';
         if (savedTheme === 'system') {
             applyTheme('system');
         }
@@ -1236,7 +1237,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initial theme load
-    const initialTheme = localStorage.getItem('drbrooks-theme') || 'dark';
+    const initialTheme = localStorage.getItem('drbrooks-theme') || 'light';
     applyTheme(initialTheme);
 
 
