@@ -7,7 +7,7 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
     <!-- FontAwesome for Premium Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Vis.js for Obsidian Knowledge Graph style network map -->
@@ -15,18 +15,12 @@
     <!-- Marked.js for fast client-side markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- Stylesheet -->
-    <link rel="stylesheet" href="./static/style.css?v=20260729-lovable-v2">
+    <link rel="stylesheet" href="./static/style.css?v=20260729-xai-v1">
     <script>
         (function() {
-            const savedTheme = localStorage.getItem('drbrooks-theme') || 'light';
-            if (savedTheme === 'dark') {
-                document.documentElement.classList.add('theme-dark');
-            } else if (savedTheme === 'system') {
-                const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                if (systemPrefersDark) {
-                    document.documentElement.classList.add('theme-dark');
-                }
-            }
+            // Default xAI theme is dark canvas
+            localStorage.setItem('drbrooks-theme', 'dark');
+            document.documentElement.classList.add('theme-dark');
         })();
     </script>
 </head>
@@ -60,24 +54,22 @@
             <div class="stats-card">
                 <div class="stat-item">
                     <span class="stat-value" id="stat-count">0</span>
-                    <span class="stat-label">수집된 기사</span>
+                    <span class="stat-label">// ARTICLES</span>
                 </div>
                 <div class="stat-divider"></div>
                 <div class="stat-item">
                     <span class="stat-value" id="stat-latest-date">N/A</span>
-                    <span class="stat-label">최근 작성일</span>
+                    <span class="stat-label">// LATEST</span>
                 </div>
             </div>
-
-
 
             <!-- Articles List -->
             <div class="articles-list-container">
                 <div class="list-header">
-                    <h2><i class="fa-solid fa-list-ul"></i> 글 목록</h2>
+                    <h2>// 01. ARTICLES_INDEX</h2>
                     <div class="search-box">
                         <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                        <input type="text" id="search-input" placeholder="제목 또는 날짜 검색...">
+                        <input type="text" id="search-input" placeholder="SEARCH ARTICLES OR DATES...">
                     </div>
                 </div>
                 <div class="articles-list" id="articles-list">

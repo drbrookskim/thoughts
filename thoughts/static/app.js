@@ -686,15 +686,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('graph-canvas');
         if (!container) return;
         
-        const isDark = document.documentElement.classList.contains('theme-dark');
-        const isLight = !isDark;
-        const catFontColor = isLight ? '#1c1c1c' : '#f7f4ed';
-        const catBg = isLight ? '#f7f4ed' : '#1c1c1b';
-        const catBgHighlight = isLight ? '#eceae4' : '#262624';
-        const artFontColor = isLight ? '#1c1c1c' : '#f7f4ed';
-        const artBg = isLight ? '#5f5f5d' : '#a1a19e';
-        const artBgHover = isLight ? '#1c1c1c' : '#f7f4ed';
-        const edgeBase = isLight ? '#eceae4' : '#282826';
+        const isDark = true;
+        const isLight = false;
+        const catFontColor = '#ffffff';
+        const catBg = '#0a0a0a';
+        const catBgHighlight = '#191919';
+        const artFontColor = '#dadbdf';
+        const artBg = '#7d8187';
+        const artBgHover = '#ffffff';
+        const edgeBase = '#212327';
 
         // 1. Curated 7-Category Metadata Definition
         const categories = {
