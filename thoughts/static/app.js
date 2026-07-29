@@ -1,0 +1,1278 @@
+// ==========================================================================
+// 🚀 BRUNCH SCRAPER FRONTEND LOGIC (VANILLA JS)
+// ==========================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // State management
+    let articles = [];
+    let activeArticleId = null;
+    let scrapeInterval = null;
+    let activeCategoryFilter = null;
+
+    // DOM Elements
+    const statCount = document.getElementById('stat-count');
+    const statLatestDate = document.getElementById('stat-latest-date');
+    
+    // FAB & Admin Modal Elements
+    const fabSyncBtn = document.getElementById('fab-sync-btn');
+    const adminModal = document.getElementById('admin-modal');
+    const btnModalClose = document.getElementById('btn-modal-close');
+    const modalStatePassword = document.getElementById('modal-state-password');
+    const modalStateConsole = document.getElementById('modal-state-console');
+    const adminPasswordForm = document.getElementById('admin-password-form');
+    const adminPasswordInput = document.getElementById('admin-password-input');
+    const passwordErrorMsg = document.getElementById('password-error-msg');
+    
+    const scraperStatusBadge = document.getElementById('scraper-status-badge');
+    const consoleLogs = document.getElementById('console-logs');
+    const monitorProgressCount = document.getElementById('monitor-progress-count');
+    
+    const searchInput = document.getElementById('search-input');
+    const articlesList = document.getElementById('articles-list');
+    
+    const welcomeView = document.getElementById('welcome-view');
+    const articleView = document.getElementById('article-view');
+    
+    const viewTitle = document.getElementById('view-title');
+    const viewDate = document.getElementById('view-date');
+    const viewFileInfo = document.getElementById('view-file-info');
+    const viewUrlBtn = document.getElementById('view-url-btn');
+    const viewContent = document.getElementById('view-content');
+
+    // 🔔 Sync Banner DOM Elements
+    const syncNotificationBanner = document.getElementById('sync-notification-banner');
+    const notifyOnlineCount = document.getElementById('notify-online-count');
+    const notifyLocalCount = document.getElementById('notify-local-count');
+    const btnBannerSync = document.getElementById('btn-banner-sync');
+    const btnBannerClose = document.getElementById('btn-banner-close');
+
+    // Tab and Graph View DOM Elements
+    const tabGraphBtn = document.getElementById('tab-graph-btn');
+    const tabReaderBtn = document.getElementById('tab-reader-btn');
+    const tabWriteBtn = document.getElementById('tab-write-btn');
+    const graphViewContainer = document.getElementById('graph-view-container');
+    const writeView = document.getElementById('write-view');
+    const writeForm = document.getElementById('write-form');
+    const writeDate = document.getElementById('write-date');
+    const writeCategory = document.getElementById('write-category');
+    const writeTitle = document.getElementById('write-title');
+    const writeContent = document.getElementById('write-content');
+    const writePassword = document.getElementById('write-password');
+    const btnCancelWrite = document.getElementById('btn-cancel-write');
+
+    let networkInstance = null; // vis.js network instance
+    let nodesDataset = null;
+    let edgesDataset = null;
+    let focusedArticleId = null; // Currently centered article in knowledge graph
+
+    // Check if running in local Flask environment (port 5050)
+    const isFlaskEnv = window.location.port === '5050';
+
+    // ==========================================================================
+    // 📂 ARTICLE MANAGEMENT & FETCHING
+    // ==========================================================================
+
+    // Fetch and render the list of available articles
+    async function loadArticles() {
+        try {
+            const response = await fetch('api/articles.json');
+            articles = await response.json();
+            
+            renderArticlesList(articles);
+            updateStats();
+        } catch (error) {
+            console.error('Error fetching articles:', error);
+            articlesList.innerHTML = `
+                <div class="list-placeholder">
+                    <i class="fa-solid fa-triangle-exclamation" style="color: var(--color-error)"></i>
+                    <p>목록을 불러오는 데 실패했습니다.</p>
+                </div>
+            `;
+        }
+    }
+
+    // Render articles list in the sidebar
+    function renderArticlesList(items) {
+        if (items.length === 0) {
+            articlesList.innerHTML = `
+                <div class="list-placeholder">
+                    <i class="fa-solid fa-folder-open"></i>
+                    <p>수집된 글이 없습니다. 위 폼을 이용해 크롤링을 구동해보세요!</p>
+                </div>
+            `;
+            return;
+        }
+
+        articlesList.innerHTML = '';
+        items.forEach(article => {
+            const item = document.createElement('div');
+            item.className = `article-item ${activeArticleId === article.id ? 'active' : ''}`;
+            item.setAttribute('data-id', article.id);
+            
+            item.innerHTML = `
+                <div class="item-meta">
+                    <span class="item-id">ID ${article.id}</span>
+                    <span class="item-date">${article.date}</span>
+                </div>
+                <h3>${article.title}</h3>
+                <div class="item-footer">
+                    <i class="fa-regular fa-file-lines"></i>
+                    <span>${article.size_kb} KB</span>
+                </div>
+            `;
+
+            item.addEventListener('click', () => {
+                selectArticle(article.id);
+            });
+
+            articlesList.appendChild(item);
+        });
+    }
+
+    // Select an article and render its markdown content
+    async function selectArticle(id, shouldSwitchTab = true, syncGraphFocus = true) {
+        // Automatically switch to reader tab if requested
+        if (shouldSwitchTab && (tabGraphBtn.classList.contains('active') || (tabWriteBtn && tabWriteBtn.classList.contains('active')))) {
+            tabReaderBtn.classList.add('active');
+            tabGraphBtn.classList.remove('active');
+            if (tabWriteBtn) tabWriteBtn.classList.remove('active');
+            graphViewContainer.classList.add('hidden');
+            if (writeView) writeView.classList.add('hidden');
+        }
+
+        // Toggle active classes in list
+        const items = articlesList.querySelectorAll('.article-item');
+        items.forEach(item => {
+            if (parseInt(item.getAttribute('data-id')) === id) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+
+        activeArticleId = id;
+        if (syncGraphFocus) {
+            focusedArticleId = id; // Sync centered article in knowledge graph
+        }
+        
+        // Auto-close mobile sidebar when an article is selected
+        if (window.innerWidth <= 1024) {
+            const sidebarEl = document.querySelector('.sidebar');
+            if (sidebarEl) sidebarEl.classList.remove('mobile-open');
+        }
+
+        const isReaderActive = shouldSwitchTab || tabReaderBtn.classList.contains('active');
+
+        // Show viewer loading state if reader is active
+        if (isReaderActive) {
+            welcomeView.classList.add('hidden');
+            articleView.classList.remove('hidden');
+        }
+        
+        // Reset loading text in DOM (remains hidden if reader tab is inactive)
+        viewTitle.textContent = "불러오는 중...";
+        viewDate.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> 로딩 중`;
+        viewFileInfo.innerHTML = '';
+        if (viewUrlBtn) viewUrlBtn.classList.add('hidden');
+        viewContent.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 300px; color: var(--text-secondary); gap: 16px;">
+                <i class="fa-solid fa-spinner fa-spin fa-2x" style="color: var(--color-primary)"></i>
+                <p>글을 불러오고 있습니다.</p>
+            </div>
+        `;
+
+        try {
+            let data;
+            if (window.localArticleContents && window.localArticleContents[id]) {
+                data = window.localArticleContents[id];
+            } else {
+                const response = await fetch(`api/article/${id}.json`);
+                data = await response.json();
+            }
+
+            if (!data || data.error) {
+                viewContent.innerHTML = `<p style="color: var(--color-error)">[오류] ${data ? data.error : "글을 찾을 수 없습니다."}</p>`;
+                return;
+            }
+
+            // Find selected article details for header meta
+            const articleMeta = articles.find(a => a.id === id);
+
+            // Render details
+            viewTitle.textContent = articleMeta ? articleMeta.title : "제목 없음";
+            viewDate.innerHTML = `<i class="fa-regular fa-calendar"></i> ${articleMeta ? articleMeta.date : 'N/A'}`;
+            viewFileInfo.innerHTML = `<i class="fa-regular fa-file-code"></i> ${data.filename} (${articleMeta ? articleMeta.size_kb : 0} KB)`;
+            
+            if (articleMeta && articleMeta.url) {
+                if (viewUrlBtn) {
+                    viewUrlBtn.href = articleMeta.url;
+                    viewUrlBtn.classList.remove('hidden');
+                }
+            } else {
+                if (viewUrlBtn) viewUrlBtn.classList.add('hidden');
+            }
+
+            // Clean headers and render Markdown content
+            let mdContent = data.content;
+            
+            // Render Markdown using Marked.js
+            viewContent.innerHTML = marked.parse(mdContent);
+
+            // Smooth scroll content area to top if reader is active
+            if (isReaderActive) {
+                document.querySelector('.viewer-content').scrollTop = 0;
+            }
+
+        } catch (error) {
+            console.error('Error fetching article content:', error);
+            viewContent.innerHTML = `<p style="color: var(--color-error)">기사 본문을 불러오는 데 실패했습니다. (${error.message})</p>`;
+        }
+    }
+
+    // Update statistics dashboard card
+    function updateStats() {
+        statCount.textContent = articles.length;
+        if (articles.length > 0) {
+            // Find latest date in list
+            const dates = articles.map(a => a.date).filter(d => d !== 'N/A');
+            if (dates.length > 0) {
+                // Dates are strings like YYYY-MM-DD. Simple sorting works
+                dates.sort();
+                statLatestDate.textContent = dates[dates.length - 1];
+            } else {
+                statLatestDate.textContent = 'N/A';
+            }
+        } else {
+            statLatestDate.textContent = 'N/A';
+        }
+    }
+
+    // Live search filter in sidebar
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        if (!query) {
+            renderArticlesList(articles);
+            return;
+        }
+
+        const filtered = articles.filter(article => {
+            return article.title.toLowerCase().includes(query) || 
+                   article.date.includes(query) ||
+                   article.id.toString().includes(query);
+        });
+
+        renderArticlesList(filtered);
+    });
+
+
+    // ==========================================================================
+    // ⚙️ SCRAPER CONTROL VIA FAB & MODAL
+    // ==========================================================================
+    let isScraperActive = false;
+
+    // Click listener on FAB Sync button
+    fabSyncBtn.addEventListener('click', async () => {
+        // Check current running state from server first
+        try {
+            const response = await fetch('/api/scrape/status');
+            const status = await response.json();
+            
+            if (status.is_running) {
+                // If running, open console log immediately
+                openModal(true);
+                startLogsPolling();
+            } else {
+                // If not running, ask for password
+                openModal(false);
+            }
+        } catch (error) {
+            console.error("Error checking scraper status on FAB click:", error);
+            openModal(false); // Fallback to password state
+        }
+    });
+
+    // Close Modal
+    btnModalClose.addEventListener('click', () => {
+        adminModal.classList.add('hidden');
+        document.body.classList.remove('modal-open');
+    });
+
+    // Close Modal on clicking backdrop
+    adminModal.addEventListener('click', (e) => {
+        if (e.target === adminModal) {
+            adminModal.classList.add('hidden');
+            document.body.classList.remove('modal-open');
+        }
+    });
+
+    // Open Modal function
+    function openModal(showConsole = false) {
+        adminModal.classList.remove('hidden');
+        document.body.classList.add('modal-open');
+        passwordErrorMsg.classList.add('hidden');
+        adminPasswordInput.value = '';
+
+        if (showConsole) {
+            modalStatePassword.classList.add('hidden');
+            modalStateConsole.classList.remove('hidden');
+        } else {
+            modalStatePassword.classList.remove('hidden');
+            modalStateConsole.classList.add('hidden');
+            setTimeout(() => adminPasswordInput.focus(), 100);
+        }
+    }
+
+    // Submit password and start scraping
+    adminPasswordForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const password = adminPasswordInput.value;
+        passwordErrorMsg.classList.add('hidden');
+
+        try {
+            const response = await fetch('/api/scrape', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    password: password
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.status === 401 || result.error) {
+                // Shake modal content and show error
+                const modalContent = document.querySelector('.modal-content');
+                modalContent.classList.add('shake');
+                setTimeout(() => modalContent.classList.remove('shake'), 400);
+
+                passwordErrorMsg.textContent = result.error || "비밀번호가 일치하지 않습니다.";
+                passwordErrorMsg.classList.remove('hidden');
+                adminPasswordInput.focus();
+                return;
+            }
+
+            // Transition to Console state
+            modalStatePassword.classList.add('hidden');
+            modalStateConsole.classList.remove('hidden');
+            consoleLogs.textContent = "[*] 관리자 승인 완료. 크롤링 작업을 준비하는 중...\n";
+            scraperStatusBadge.textContent = "준비 중";
+            scraperStatusBadge.className = "status-badge running";
+            fabSyncBtn.classList.add('spinning');
+
+            // Start logs polling
+            startLogsPolling();
+
+        } catch (error) {
+            passwordErrorMsg.textContent = `서버 연결 오류: ${error.message}`;
+            passwordErrorMsg.classList.remove('hidden');
+        }
+    });
+
+    // Polling interval loop for real-time console status
+    function startLogsPolling() {
+        if (scrapeInterval) clearInterval(scrapeInterval);
+        fabSyncBtn.classList.add('spinning');
+        
+        scrapeInterval = setInterval(async () => {
+            try {
+                const response = await fetch('/api/scrape/status');
+                const status = await response.json();
+
+                // Update badge and progress count
+                monitorProgressCount.textContent = status.saved_count;
+                
+                if (status.is_running) {
+                    scraperStatusBadge.textContent = `글 ID ${status.current_id} 분석 중`;
+                    scraperStatusBadge.className = "status-badge running";
+                    isScraperActive = true;
+                } else if (status.finished) {
+                    scraperStatusBadge.textContent = "수집 완료";
+                    scraperStatusBadge.className = "status-badge";
+                    fabSyncBtn.classList.remove('spinning');
+                    clearInterval(scrapeInterval);
+                    scrapeInterval = null;
+                    isScraperActive = false;
+                    
+                    // Reload the articles sidebar immediately to show new arrivals!
+                    loadArticles();
+                    
+                    // If notification banner is showing, hide it since we synced
+                    syncNotificationBanner.classList.add('hidden');
+                } else if (status.error) {
+                    scraperStatusBadge.textContent = "오류 발생";
+                    scraperStatusBadge.className = "status-badge";
+                    fabSyncBtn.classList.remove('spinning');
+                    clearInterval(scrapeInterval);
+                    scrapeInterval = null;
+                    isScraperActive = false;
+                }
+
+                // Render latest logs
+                if (status.log && status.log.length > 0) {
+                    consoleLogs.textContent = status.log.join('\n');
+                    // Auto-scroll terminal console to bottom
+                    consoleLogs.scrollTop = consoleLogs.scrollHeight;
+                }
+
+            } catch (error) {
+                console.error("Error polling scraper status:", error);
+            }
+        }, 800);
+    }
+
+    // Check on page load if scraper is already running from a previous instance
+    async function checkScraperActiveState() {
+        if (window.location.port !== '5050' && !window.location.hostname.includes('127.0.0.1')) {
+            // Disable sync checks on GitHub Pages or other non-local environments
+            fabSyncBtn.style.display = 'none';
+            return;
+        }
+        try {
+            const response = await fetch('/api/scrape/status');
+            const status = await response.json();
+            
+            if (status.is_running) {
+                fabSyncBtn.classList.add('spinning');
+                startLogsPolling();
+            }
+        } catch (error) {
+            console.error("Error checking initial scraper state:", error);
+        }
+    }
+
+
+    // ==========================================================================
+    // 🔗 TAB TOGGLING CONTROL
+    // ==========================================================================
+    tabGraphBtn.addEventListener('click', () => {
+        tabGraphBtn.classList.add('active');
+        tabReaderBtn.classList.remove('active');
+        if (tabWriteBtn) tabWriteBtn.classList.remove('active');
+        graphViewContainer.classList.remove('hidden');
+        welcomeView.classList.add('hidden');
+        articleView.classList.add('hidden');
+        if (writeView) writeView.classList.add('hidden');
+
+        // Always re-initialize the graph to reflect any new article selection focus
+        initKnowledgeGraph(articles);
+
+        // Trigger Vis.js dynamic canvas redraw to fix any hidden sizing bugs
+        if (networkInstance) {
+            setTimeout(() => {
+                networkInstance.redraw();
+                networkInstance.fit();
+            }, 100);
+        }
+    });
+
+    tabReaderBtn.addEventListener('click', () => {
+        tabReaderBtn.classList.add('active');
+        tabGraphBtn.classList.remove('active');
+        if (tabWriteBtn) tabWriteBtn.classList.remove('active');
+        graphViewContainer.classList.add('hidden');
+        if (writeView) writeView.classList.add('hidden');
+        
+        if (activeArticleId) {
+            articleView.classList.remove('hidden');
+            welcomeView.classList.add('hidden');
+        } else {
+            welcomeView.classList.remove('hidden');
+            articleView.classList.add('hidden');
+        }
+    });
+
+    if (tabWriteBtn) {
+        tabWriteBtn.addEventListener('click', () => {
+            tabWriteBtn.classList.add('active');
+            tabGraphBtn.classList.remove('active');
+            tabReaderBtn.classList.remove('active');
+            
+            graphViewContainer.classList.add('hidden');
+            welcomeView.classList.add('hidden');
+            articleView.classList.add('hidden');
+            if (writeView) writeView.classList.remove('hidden');
+
+            // Reset fields
+            if (writeTitle) writeTitle.value = '';
+            if (writeContent) writeContent.value = '';
+            
+            // Set current date in YYYY-MM-DD
+            if (writeDate) {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                writeDate.value = `${year}-${month}-${day}`;
+            }
+
+            // Restore password from sessionStorage if available
+            if (writePassword) {
+                writePassword.value = sessionStorage.getItem('admin_password') || '';
+            }
+            
+            // Focus on title
+            if (writeTitle) {
+                setTimeout(() => writeTitle.focus(), 100);
+            }
+        });
+    }
+
+    if (btnCancelWrite) {
+        btnCancelWrite.addEventListener('click', () => {
+            tabReaderBtn.click();
+        });
+    }
+
+    function downloadMarkdownFallback(id, title, date, category, content) {
+        const safeTitle = title.replace(/[\/:*?"<>|]/g, '_').trim();
+        const filename = `${id}_${safeTitle}.md`;
+        
+        const fileContent = `# ${title}\n\n- **작성일**: ${date}\n- **카테고리**: ${category}\n\n---\n\n${content}\n`;
+        
+        const blob = new Blob([fileContent], { type: 'text/markdown;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    if (writeForm) {
+        writeForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const title = writeTitle.value.trim();
+            const date = writeDate.value;
+            const category = writeCategory.value;
+            const content = writeContent.value.trim();
+            const password = writePassword.value;
+
+            if (!title || !content) {
+                alert("제목과 본문을 입력해주세요.");
+                return;
+            }
+
+            const btnSave = document.getElementById('btn-save-article');
+            const originalHtml = btnSave ? btnSave.innerHTML : '저장하기';
+
+            try {
+                if (btnSave) {
+                    btnSave.disabled = true;
+                    btnSave.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> 저장 중...`;
+                }
+
+                const response = await fetch('/api/article', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title,
+                        date,
+                        category,
+                        content,
+                        password
+                    })
+                });
+
+                if (response.status === 404 || response.status === 502 || response.status === 503) {
+                    throw new Error(`Server returned status ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (btnSave) {
+                    btnSave.disabled = false;
+                    btnSave.innerHTML = originalHtml;
+                }
+
+                if (response.status === 401 || result.error) {
+                    const actionsEl = document.querySelector('.write-actions');
+                    if (actionsEl) {
+                        actionsEl.classList.add('shake');
+                        setTimeout(() => actionsEl.classList.remove('shake'), 400);
+                    }
+                    alert(result.error || "비밀번호가 올바르지 않습니다.");
+                    if (writePassword) writePassword.focus();
+                    return;
+                }
+
+                // Success! Save password in sessionStorage
+                sessionStorage.setItem('admin_password', password);
+                
+                if (writeTitle) writeTitle.value = '';
+                if (writeContent) writeContent.value = '';
+                if (writePassword) writePassword.value = '';
+
+                // Reload the article list
+                await loadArticles();
+
+                // Select and open the new article
+                if (result.id) {
+                    await selectArticle(result.id, true, true);
+                }
+
+            } catch (error) {
+                console.warn("API save unavailable, falling back to local file download:", error);
+                
+                if (btnSave) {
+                    btnSave.disabled = false;
+                    btnSave.innerHTML = originalHtml;
+                }
+                
+                // Fallback: Generate custom ID and trigger markdown download
+                const maxId = articles.reduce((max, art) => art.id > max ? art.id : max, 0);
+                const newId = maxId + 1;
+                
+                downloadMarkdownFallback(newId, title, date, category, content);
+                
+                // Construct metadata and content for local-only storage
+                const safeTitle = title.replace(/[\/:*?"<>|]/g, '_').trim();
+                const filename = `${newId}_${safeTitle}.md`;
+                const sizeKb = Math.round((content.length * 2) / 1024 * 10) / 10;
+                
+                const localArticleMeta = {
+                    id: newId,
+                    title: title,
+                    date: date,
+                    url: "",
+                    filename: filename,
+                    size_kb: sizeKb,
+                    category: category
+                };
+                
+                // Add to client memory
+                articles.unshift(localArticleMeta);
+                articles.sort((a, b) => b.id - a.id);
+                
+                if (!window.localArticleContents) {
+                    window.localArticleContents = {};
+                }
+                window.localArticleContents[newId] = {
+                    id: newId,
+                    title: title,
+                    date: date,
+                    url: "",
+                    filename: filename,
+                    size_kb: sizeKb,
+                    category: category,
+                    content: `# ${title}\n\n- **작성일**: ${date}\n- **카테고리**: ${category}\n\n---\n\n${content}`
+                };
+                
+                // Re-render
+                renderArticlesList(articles);
+                updateStats();
+                
+                alert(`[안내] 로컬 서버가 연동되지 않았습니다.\n작성한 글이 '${filename}' 파일로 다운로드되었습니다.\n(현재 웹 브라우저 화면의 목록 및 지식 그래프에 반영되었습니다.)`);
+                
+                if (writeTitle) writeTitle.value = '';
+                if (writeContent) writeContent.value = '';
+                if (writePassword) writePassword.value = '';
+                
+                // Open and view it
+                await selectArticle(newId, true, true);
+            }
+        });
+    }
+
+    // ==========================================================================
+    // 🧠 OBSIDIAN KNOWLEDGE GRAPH VIEW ENGINE
+    // ==========================================================================
+    function initKnowledgeGraph(items) {
+        const container = document.getElementById('graph-canvas');
+        if (!container) return;
+        
+        const isDark = document.documentElement.classList.contains('theme-dark');
+        const isLight = !isDark;
+        const catFontColor = isLight ? '#1c1c1c' : '#f7f4ed';
+        const catBg = isLight ? '#f7f4ed' : '#1c1c1b';
+        const catBgHighlight = isLight ? '#eceae4' : '#262624';
+        const artFontColor = isLight ? '#1c1c1c' : '#f7f4ed';
+        const artBg = isLight ? '#5f5f5d' : '#a1a19e';
+        const artBgHover = isLight ? '#1c1c1c' : '#f7f4ed';
+        const edgeBase = isLight ? '#eceae4' : '#282826';
+
+        // 1. Curated 7-Category Metadata Definition
+        const categories = {
+            "기획론": { label: "기획론", color: "#a18cd1", colorLight: "#6d5b97", lineColor: "#504668", labelColorLight: "#4a3b6c", shadow: "rgba(161, 140, 209, 0.2)" },
+            "상품기획": { label: "상품기획", color: "#fbd043", colorLight: "#a07800", lineColor: "#7d6821", labelColorLight: "#6a520d", shadow: "rgba(251, 208, 67, 0.2)" },
+            "AI와 기술": { label: "AI와 기술", color: "#00f2fe", colorLight: "#007d85", lineColor: "#00797f", labelColorLight: "#006266", shadow: "rgba(0, 242, 254, 0.2)" },
+            "인간과 심리": { label: "인간과 심리", color: "#ff6b8b", colorLight: "#c42d4f", lineColor: "#803545", labelColorLight: "#782538", shadow: "rgba(255, 107, 139, 0.2)" },
+            "사고와 언어": { label: "사고와 언어", color: "#ff9f43", colorLight: "#b86200", lineColor: "#805022", labelColorLight: "#78440d", shadow: "rgba(255, 159, 67, 0.2)" },
+            "관계와 사회": { label: "관계와 사회", color: "#4facfe", colorLight: "#0060ad", lineColor: "#27567f", labelColorLight: "#184e77", shadow: "rgba(79, 172, 254, 0.2)" },
+            "경제와 가치": { label: "경제와 가치", color: "#2ecc71", colorLight: "#1b7a43", lineColor: "#176638", labelColorLight: "#135c32", shadow: "rgba(46, 204, 113, 0.2)" }
+        };
+
+        const nodesArray = [];
+        const edgesArray = [];
+
+        // Resolve focused article details if set
+        let focusedArticle = null;
+        if (focusedArticleId !== null) {
+            focusedArticle = items.find(a => a.id === focusedArticleId);
+            if (!focusedArticle) focusedArticleId = null; // Reset if invalid
+        }
+        const focusedCatId = focusedArticle ? (focusedArticle.category || "기획론") : null;
+        const focusedCatMeta = focusedCatId ? categories[focusedCatId] : null;
+
+        // Group articles by their category to establish local associative links (Obsidian Clusters)
+        const articlesByCategory = {};
+        Object.keys(categories).forEach(cat => {
+            articlesByCategory[cat] = [];
+        });
+        items.forEach(article => {
+            const cat = article.category || "기획론";
+            if (articlesByCategory[cat]) {
+                articlesByCategory[cat].push(article);
+            }
+        });
+
+        // Add Article Nodes (No Category Hub Nodes to reflect pure Obsidian structure!)
+        items.forEach(article => {
+            const catId = article.category || "기획론";
+            const catMeta = categories[catId] || categories["기획론"];
+            const catColor = isLight ? catMeta.colorLight : catMeta.color;
+            const isFocused = (article.id === focusedArticleId);
+            const isSameCat = (catId === focusedCatId);
+
+            if (isFocused) {
+                // Massive Centered Hero Node (Main Center Node)
+                nodesArray.push({
+                    id: article.id,
+                    label: article.title, // Full title without truncation for absolute focus
+                    title: `[현재 메인 글]\n${article.title}\n(분야: ${catId} | 작성일: ${article.date})`,
+                    color: {
+                        background: catColor, // Neon glow core matching the category
+                        border: isLight ? '#0f172a' : '#ffffff',
+                        highlight: {
+                            background: catColor,
+                            border: isLight ? '#0f172a' : '#ffffff'
+                        },
+                        hover: {
+                            background: catColor,
+                            border: isLight ? '#0f172a' : '#ffffff'
+                        }
+                    },
+                    size: 4, // Smaller hero sphere to match Obsidian style
+                    mass: 3.5, // High mass pulls other nodes visually and structurally
+                    font: { size: 12, bold: true, color: catFontColor, face: 'Outfit' },
+                    shadow: { enabled: true, color: catMeta.shadow, size: 25 }
+                });
+            } else {
+                // Regular Article Nodes
+                let nodeLabel = article.title;
+                if (nodeLabel.length > 35) {
+                    nodeLabel = nodeLabel.substring(0, 34) + "...";
+                }
+
+                let nodeSize = 3.0;
+                let nodeFontSize = 10;
+                let nodeFontColor = artFontColor;
+                let nodeBgColor = catColor; // Premium Category Glow by default!
+                let nodeBorderColor = catColor;
+
+                // Focus styling optimization
+                if (focusedArticleId !== null) {
+                    if (isSameCat) {
+                        nodeSize = 4.0; // Sibling articles clustered beautifully
+                        nodeFontSize = 11;
+                        nodeFontColor = isLight ? catMeta.labelColorLight : catMeta.color; // Highlight color (darker on light theme)
+                        nodeBorderColor = catColor;
+                    } else {
+                        nodeSize = 2.0; // Shrink unrelated articles
+                        nodeFontSize = 8;
+                        nodeFontColor = isLight ? '#cbd5e1' : '#334155'; // Fade unrelated text
+                        nodeBgColor = isLight ? '#e2e8f0' : '#1e293b'; // Fade unrelated circle
+                        nodeBorderColor = isLight ? '#f1f5f9' : '#111827'; // Fade unrelated border
+                    }
+                } else if (activeCategoryFilter !== null) {
+                    // Category filter styling optimization
+                    if (catId === activeCategoryFilter) {
+                        nodeSize = 4.0; // Highlight selected category articles
+                        nodeFontSize = 11;
+                        nodeFontColor = isLight ? catMeta.labelColorLight : catMeta.color; // Highlight color (darker on light theme)
+                        nodeBorderColor = catColor;
+                    } else {
+                        nodeSize = 1.5; // Highly shrink other articles
+                        nodeFontSize = 0; // Hide font labels for other categories
+                        nodeFontColor = 'transparent';
+                        nodeBgColor = isLight ? '#e2e8f0' : '#1e293b';
+                        nodeBorderColor = isLight ? '#f1f5f9' : '#111827';
+                    }
+                }
+
+                nodesArray.push({
+                    id: article.id,
+                    label: nodeLabel,
+                    title: `${article.title}\n(분야: ${catId} | 작성일: ${article.date})`,
+                    color: {
+                        background: nodeBgColor,
+                        border: nodeBorderColor,
+                        highlight: {
+                            background: artBgHover,
+                            border: catColor
+                        },
+                        hover: {
+                            background: artBgHover,
+                            border: catColor
+                        }
+                    },
+                    size: nodeSize,
+                    font: { size: nodeFontSize, color: nodeFontColor, face: 'Outfit' }
+                });
+            }
+        });
+
+        // Add Organic Intra-Category Connections (Obsidian Cluster Architecture)
+        Object.entries(articlesByCategory).forEach(([catId, catArticles]) => {
+            const catMeta = categories[catId];
+            const catColor = isLight ? catMeta.colorLight : catMeta.color;
+            
+            // Sort articles chronologically/numerically to form a clean logical spine
+            catArticles.sort((a, b) => a.id - b.id);
+            
+            catArticles.forEach((article, idx) => {
+                const isFocused = (article.id === focusedArticleId);
+                const isSameCat = (catId === focusedCatId);
+                
+                // 1. Connect to adjacent article (Spine Chain)
+                if (idx > 0) {
+                    const prev = catArticles[idx - 1];
+                    let edgeColor = catMeta.lineColor;
+                    let edgeWidth = 0.65;
+                    
+                    if (focusedArticleId !== null) {
+                        if (isSameCat) {
+                            edgeColor = catMeta.lineColor;
+                            edgeWidth = 1.0;
+                        } else {
+                            edgeColor = isLight ? '#f1f5f9' : '#111827';
+                            edgeWidth = 0.35;
+                        }
+                    } else if (activeCategoryFilter !== null) {
+                        if (catId === activeCategoryFilter) {
+                            edgeColor = catMeta.lineColor;
+                            edgeWidth = 1.0;
+                        } else {
+                            edgeColor = isLight ? '#f1f5f9' : '#111827';
+                            edgeWidth = 0.15;
+                        }
+                    }
+                    
+                    edgesArray.push({
+                        id: `edge_prev_${article.id}_${prev.id}`,
+                        from: article.id,
+                        to: prev.id,
+                        length: 30,
+                        width: edgeWidth,
+                        color: {
+                            color: edgeColor,
+                            highlight: catColor,
+                            hover: catColor
+                        }
+                    });
+                }
+                
+                // 2. Connect to index-3 sibling (Short Loop / Branching)
+                if (idx > 2 && idx % 3 === 0) {
+                    const sibling = catArticles[idx - 3];
+                    let edgeColor = catMeta.lineColor;
+                    let edgeWidth = 0.5;
+                    
+                    if (focusedArticleId !== null) {
+                        if (isSameCat) {
+                            edgeColor = catMeta.lineColor;
+                            edgeWidth = 0.85;
+                        } else {
+                            edgeColor = isLight ? '#f1f5f9' : '#111827';
+                            edgeWidth = 0.25;
+                        }
+                    } else if (activeCategoryFilter !== null) {
+                        if (catId === activeCategoryFilter) {
+                            edgeColor = catMeta.lineColor;
+                            edgeWidth = 0.85;
+                        } else {
+                            edgeColor = isLight ? '#f1f5f9' : '#111827';
+                            edgeWidth = 0.15;
+                        }
+                    }
+                    
+                    edgesArray.push({
+                        id: `edge_sib3_${article.id}_${sibling.id}`,
+                        from: article.id,
+                        to: sibling.id,
+                        length: 50,
+                        width: edgeWidth,
+                        color: {
+                            color: edgeColor,
+                            highlight: catColor,
+                            hover: catColor
+                        }
+                    });
+                }
+                
+                // 3. Connect to index-7 sibling (Longer structural cross-linking)
+                if (idx > 6 && idx % 7 === 0) {
+                    const sibling = catArticles[idx - 7];
+                    let edgeColor = catMeta.lineColor;
+                    let edgeWidth = 0.5;
+                    
+                    if (focusedArticleId !== null) {
+                        if (isSameCat) {
+                            edgeColor = catMeta.lineColor;
+                            edgeWidth = 0.85;
+                        } else {
+                            edgeColor = isLight ? '#f1f5f9' : '#111827';
+                            edgeWidth = 0.25;
+                        }
+                    } else if (activeCategoryFilter !== null) {
+                        if (catId === activeCategoryFilter) {
+                            edgeColor = catMeta.lineColor;
+                            edgeWidth = 0.85;
+                        } else {
+                            edgeColor = isLight ? '#f1f5f9' : '#111827';
+                            edgeWidth = 0.15;
+                        }
+                    }
+                    
+                    edgesArray.push({
+                        id: `edge_sib7_${article.id}_${sibling.id}`,
+                        from: article.id,
+                        to: sibling.id,
+                        length: 70,
+                        width: edgeWidth,
+                        color: {
+                            color: edgeColor,
+                            highlight: catColor,
+                            hover: catColor
+                        }
+                    });
+                }
+
+                // 4. Semantic Title Keyword Connection
+                const wordsA = article.title.split(/[\s,._]+/).filter(w => w.length >= 2);
+                for (let otherIdx = 0; otherIdx < idx; otherIdx++) {
+                    const otherArticle = catArticles[otherIdx];
+                    const wordsB = otherArticle.title.split(/[\s,._]+/).filter(w => w.length >= 2);
+                    
+                    // Exclude very common stop-words
+                    const hasCommonWord = wordsA.some(w => wordsB.includes(w) && !["기획", "기획자", "상품", "생각", "이유", "가치", "분석", "인간"].includes(w));
+                    
+                    if (hasCommonWord) {
+                        let edgeColor = catMeta.lineColor;
+                        let edgeWidth = 0.75;
+                        
+                        if (focusedArticleId !== null) {
+                            if (isSameCat) {
+                                edgeColor = catColor;
+                                edgeWidth = 1.25;
+                            } else {
+                                edgeColor = isLight ? '#f1f5f9' : '#111827';
+                                edgeWidth = 0.25;
+                            }
+                        } else if (activeCategoryFilter !== null) {
+                            if (catId === activeCategoryFilter) {
+                                edgeColor = catColor;
+                                edgeWidth = 1.25;
+                            } else {
+                                edgeColor = isLight ? '#f1f5f9' : '#111827';
+                                edgeWidth = 0.15;
+                            }
+                        }
+                        
+                        edgesArray.push({
+                            id: `edge_sem_${article.id}_${otherArticle.id}`,
+                            from: article.id,
+                            to: otherArticle.id,
+                            length: 45,
+                            width: edgeWidth,
+                            color: {
+                                color: edgeColor,
+                                highlight: catColor,
+                                hover: catColor
+                            }
+                        });
+                        break; // Connect to at most one semantic partner to avoid visual clutter
+                    }
+                }
+            });
+        });
+
+        // Vis.js Data structure binding
+        const data = {
+            nodes: new vis.DataSet(nodesArray),
+            edges: new vis.DataSet(edgesArray)
+        };
+
+        // Obsidian style Force-Directed Network physics configuration
+        const options = {
+            nodes: {
+                shape: 'dot',
+                font: {
+                    face: 'Outfit'
+                },
+                borderWidth: 1.5,
+                borderWidthSelected: 2.5
+            },
+            edges: {
+                width: 1,
+                hoverWidth: 1.5,
+                smooth: false
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 150,
+                zoomView: true,
+                dragView: true,
+                zoomSpeed: 0.2 // Slow down mouse scroll zoom speed by 80% for smooth camera drifts
+            },
+            physics: {
+                stabilization: {
+                    enabled: true,
+                    iterations: 150, // Lowered from 1000 for instant loading on tab switch
+                    updateInterval: 25
+                },
+                barnesHut: {
+                    gravitationalConstant: -800, // Reduced repulsion for closer cluster grouping
+                    centralGravity: 0.35, // Stronger central pull to keep everything visible on screen
+                    springLength: 40, // Shorter connections to gather nodes together
+                    springConstant: 0.015,
+                    damping: 0.85,
+                    avoidOverlap: 0.8 // Actively prevent overlaps while bunched together
+                }
+            }
+        };
+
+        if (!networkInstance) {
+            nodesDataset = new vis.DataSet(nodesArray);
+            edgesDataset = new vis.DataSet(edgesArray);
+            const data = { nodes: nodesDataset, edges: edgesDataset };
+
+            // Instantiate
+            networkInstance = new vis.Network(container, data, options);
+
+            // Disable physics after initial stabilization to prevent nodes from drifting on click
+            networkInstance.on("stabilized", function () {
+                networkInstance.setOptions({ physics: { enabled: false } });
+            });
+
+            // Re-enable physics on drag so nodes still react organically when moved by user
+            networkInstance.on("dragStart", function () {
+                networkInstance.setOptions({ physics: { enabled: true } });
+            });
+
+            // Click interaction: Focus on node to highlight cluster, but DO NOT jump to reader. Allows dragging!
+            networkInstance.on("click", function (params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    if (typeof nodeId === 'number') {
+                        focusedArticleId = nodeId;
+                        selectArticle(nodeId, false, true); // Select, but DO NOT switch to Reader View
+                        activeCategoryFilter = null; // Clear legend filter on node select
+                        updateLegendUI();
+                        initKnowledgeGraph(articles);
+                    } else if (typeof nodeId === 'string' && nodeId.startsWith('cat_')) {
+                        focusedArticleId = null;
+                        initKnowledgeGraph(articles);
+                    }
+                } else {
+                    focusedArticleId = null;
+                    activeCategoryFilter = null; // Clear legend filter on canvas background click
+                    updateLegendUI();
+                    initKnowledgeGraph(articles);
+                }
+            });
+
+            // Right-click (Context Menu) or Long-press (Hold) -> Jump to Reader!
+            const openReader = function(nodeId) {
+                if (nodeId && typeof nodeId === 'number') {
+                    focusedArticleId = nodeId;
+                    selectArticle(nodeId, true, true); // Instantly switch to Reader View
+                    initKnowledgeGraph(articles);
+                }
+            };
+
+            networkInstance.on("oncontext", function (params) {
+                params.event.preventDefault();
+                const nodeId = networkInstance.getNodeAt(params.pointer.DOM);
+                openReader(nodeId);
+            });
+
+            networkInstance.on("hold", function (params) {
+                if (params.nodes.length > 0) {
+                    openReader(params.nodes[0]);
+                }
+            });
+        } else {
+            // Smoothly update datasets without destroying the physics layout!
+            nodesDataset.update(nodesArray);
+            edgesDataset.update(edgesArray);
+        }
+    }
+
+    // ==========================================================================
+    // 🔔 REAL-TIME INCREMENTAL SYNC CHECK (LITE VERSION)
+    // ==========================================================================
+    async function checkBrunchSync() {
+        if (window.location.port !== '5050') {
+            return;
+        }
+        try {
+            const author = 'drbrooks';
+            const response = await fetch(`/api/check_new?author=${author}`);
+            const result = await response.json();
+            
+            if (result.success && result.has_new) {
+                notifyOnlineCount.textContent = result.online_count;
+                notifyLocalCount.textContent = result.local_count;
+                syncNotificationBanner.classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error("Error during Brunch sync check:", error);
+        }
+    }
+
+    // Sync button logic: Open password validation modal immediately!
+    btnBannerSync.addEventListener('click', () => {
+        syncNotificationBanner.classList.add('hidden');
+        
+        // Open the modal
+        fabSyncBtn.click();
+    });
+
+    btnBannerClose.addEventListener('click', () => {
+        syncNotificationBanner.classList.add('hidden');
+    });
+
+
+    // ==========================================================================
+    // 🌓 SYSTEM/DARK/LIGHT THEME CONTROLLER
+    // ==========================================================================
+    const themeButtons = document.querySelectorAll('.theme-btn');
+    
+    function applyTheme(theme) {
+        themeButtons.forEach(btn => btn.classList.remove('active'));
+        
+        const activeBtn = document.querySelector(`.theme-btn[data-theme="${theme}"]`);
+        if (activeBtn) activeBtn.classList.add('active');
+        
+        if (theme === 'system') {
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (systemPrefersDark) {
+                document.body.classList.add('theme-dark');
+                document.documentElement.classList.add('theme-dark');
+            } else {
+                document.body.classList.remove('theme-dark');
+                document.documentElement.classList.remove('theme-dark');
+            }
+            localStorage.setItem('drbrooks-theme', 'system');
+        } else if (theme === 'dark') {
+            document.body.classList.add('theme-dark');
+            document.documentElement.classList.add('theme-dark');
+            localStorage.setItem('drbrooks-theme', 'dark');
+        } else {
+            document.body.classList.remove('theme-dark');
+            document.documentElement.classList.remove('theme-dark');
+            localStorage.setItem('drbrooks-theme', 'light');
+        }
+        
+        // Refresh knowledge graph with new theme colors
+        if (typeof networkInstance !== 'undefined' && networkInstance && typeof articles !== 'undefined' && articles.length > 0) {
+            initKnowledgeGraph(articles);
+        }
+    }
+    
+    themeButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const theme = btn.getAttribute('data-theme');
+            applyTheme(theme);
+        });
+    });
+    
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        const savedTheme = localStorage.getItem('drbrooks-theme') || 'light';
+        if (savedTheme === 'system') {
+            applyTheme('system');
+        }
+    });
+    
+    // ==========================================================================
+    // 🧠 LEGEND INTERACTIVE FILTER CONTROL
+    // ==========================================================================
+    const legendItems = document.querySelectorAll('.legend-item');
+    legendItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const category = item.getAttribute('data-category');
+            if (activeCategoryFilter === category) {
+                activeCategoryFilter = null;
+            } else {
+                activeCategoryFilter = category;
+                focusedArticleId = null; // Clear focused article
+            }
+            updateLegendUI();
+            initKnowledgeGraph(articles);
+        });
+    });
+
+    function updateLegendUI() {
+        const items = document.querySelectorAll('.legend-item');
+        items.forEach(item => {
+            const category = item.getAttribute('data-category');
+            if (activeCategoryFilter === null) {
+                item.classList.remove('active');
+                item.classList.remove('inactive');
+            } else if (category === activeCategoryFilter) {
+                item.classList.add('active');
+                item.classList.remove('inactive');
+            } else {
+                item.classList.remove('active');
+                item.classList.add('inactive');
+            }
+        });
+    }
+
+    // Initial theme load
+    const initialTheme = localStorage.getItem('drbrooks-theme') || 'light';
+    applyTheme(initialTheme);
+
+
+    // ==========================================================================
+    // 📱 MOBILE SIDEBAR TOGGLE
+    // ==========================================================================
+    const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
+    const sidebarElement = document.querySelector('.sidebar');
+    
+    if (mobileSidebarToggle && sidebarElement) {
+        mobileSidebarToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            sidebarElement.classList.toggle('mobile-open');
+        });
+        
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 1024) {
+                if (!sidebarElement.contains(e.target) && !mobileSidebarToggle.contains(e.target)) {
+                    sidebarElement.classList.remove('mobile-open');
+                }
+            }
+        });
+    }
+
+    // ==========================================================================
+    // 🎬 INITIAL STARTUP
+    // ==========================================================================
+    loadArticles().then(() => {
+        // Automatically open the most recent article on first load
+        if (articles.length > 0 && !activeArticleId) {
+            selectArticle(articles[0].id, false, false);
+        }
+        // Run light check silently in background only after articles are loaded
+        checkBrunchSync();
+    });
+    checkScraperActiveState();
+});
