@@ -1060,22 +1060,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 dragView: true,
                 zoomSpeed: 0.2 // Slow down mouse scroll zoom speed by 80% for smooth camera drifts
             },
-            physics: {
-                stabilization: {
-                    enabled: true,
-                    iterations: 60, // Lowered from 150 for faster tab-switch load
-                    // Match iterations so the layout is drawn once already settled — no visible drifting
-                    updateInterval: 60
-                },
-                barnesHut: {
-                    gravitationalConstant: -800, // Reduced repulsion for closer cluster grouping
-                    centralGravity: 0.35, // Stronger central pull to keep everything visible on screen
-                    springLength: 40, // Shorter connections to gather nodes together
-                    springConstant: 0.015,
-                    damping: 0.85,
-                    avoidOverlap: 0.8 // Actively prevent overlaps while bunched together
-                }
-            }
+            physics: false
         };
 
         if (!networkInstance) {
@@ -1086,10 +1071,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Instantiate
             networkInstance = new vis.Network(container, data, options);
 
-            // Disable physics after initial stabilization to prevent nodes from drifting on click
-            networkInstance.on("stabilized", function () {
-                networkInstance.setOptions({ physics: { enabled: false } });
-            });
+            // Physics is off — nodes are statically placed, no floating or drifting
 
             // Obsidian hover: keep the hovered node and its direct links lit, fade the rest of the vault
             networkInstance.on("hoverNode", function (params) {
