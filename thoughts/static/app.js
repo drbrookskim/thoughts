@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let nodesDataset = null;
     let edgesDataset = null;
     let focusedArticleId = null; // Currently centered article in knowledge graph
+    let graphAdjacency = {}; // nodeId -> Set of directly linked nodeIds, for Obsidian hover dimming
 
     // Check if running in local Flask environment (port 5050)
     const isFlaskEnv = window.location.port === '5050';
@@ -1002,6 +1003,21 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+        // Obsidian sizing: node radius scales with its link count (hubs read bigger)
+        const degreeMap = {};
+        graphAdjacency = {};
+        edgesArray.forEach(edge => {
+            degreeMap[edge.from] = (degreeMap[edge.from] || 0) + 1;
+            degreeMap[edge.to] = (degreeMap[edge.to] || 0) + 1;
+            (graphAdjacency[edge.from] = graphAdjacency[edge.from] || new Set()).add(edge.to);
+            (graphAdjacency[edge.to] = graphAdjacency[edge.to] || new Set()).add(edge.from);
+        });
+        nodesArray.forEach(node => {
+            // Preserve the focus/filter emphasis already baked into `size` as a relative weight
+            node.value = ((degreeMap[node.id] || 0) + 1) * (node.size / 3.0);
+            delete node.size;
+        });
+
         // Vis.js Data structure binding
         const data = {
             nodes: new vis.DataSet(nodesArray),
@@ -1010,13 +1026,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Obsidian style Force-Directed Network physics configuration
         const options = {
+            layout: {
+                improvedLayout: false // 7 disconnected category clusters defeat this algorithm; vis.js recommends disabling it
+            },
             nodes: {
                 shape: 'dot',
                 font: {
                     face: 'Outfit'
                 },
                 borderWidth: 1.5,
-                borderWidthSelected: 2.5
+                borderWidthSelected: 2.5,
+                scaling: {
+                    min: 4,
+                    max: 26,
+                    label: {
+                        enabled: true,
+                        min: 9,
+                        max: 22,
+                        // Obsidian hides labels until you zoom in far enough to read them
+                        drawThreshold: 10
+                    }
+                }
             },
             edges: {
                 width: 1,
@@ -1033,8 +1063,9 @@ document.addEventListener('DOMContentLoaded', () => {
             physics: {
                 stabilization: {
                     enabled: true,
-                    iterations: 150, // Lowered from 1000 for instant loading on tab switch
-                    updateInterval: 25
+                    iterations: 60, // Lowered from 150 for faster tab-switch load
+                    // Match iterations so the layout is drawn once already settled — no visible drifting
+                    updateInterval: 60
                 },
                 barnesHut: {
                     gravitationalConstant: -800, // Reduced repulsion for closer cluster grouping
@@ -1060,9 +1091,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 networkInstance.setOptions({ physics: { enabled: false } });
             });
 
-            // Re-enable physics on drag so nodes still react organically when moved by user
-            networkInstance.on("dragStart", function () {
-                networkInstance.setOptions({ physics: { enabled: true } });
+            // Obsidian hover: keep the hovered node and its direct links lit, fade the rest of the vault
+            networkInstance.on("hoverNode", function (params) {
+                const neighbors = graphAdjacency[params.node] || new Set();
+                nodesDataset.update(nodesDataset.getIds().map(id => ({
+                    id: id,
+                    opacity: (id === params.node || neighbors.has(id)) ? 1 : 0.15
+                })));
+            });
+
+            networkInstance.on("blurNode", function () {
+                nodesDataset.update(nodesDataset.getIds().map(id => ({ id: id, opacity: 1 })));
             });
 
             // Click interaction: Focus on node to highlight cluster, but DO NOT jump to reader. Allows dragging!
@@ -1111,6 +1150,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Smoothly update datasets without destroying the physics layout!
             nodesDataset.update(nodesArray);
             edgesDataset.update(edgesArray);
+            // A dataset change restarts the solver; keep it off so nodes never drift after settling
+            networkInstance.setOptions({ physics: { enabled: false } });
         }
     }
 
