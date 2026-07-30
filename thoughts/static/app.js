@@ -732,6 +732,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // Pre-calculate wide-spread positions: 7 categories on a large circle, articles scattered around each
+        const catKeys = Object.keys(categories);
+        const catCenters = {};
+        const spreadRadius = 800; // Large radius so categories are far apart
+        catKeys.forEach((cat, i) => {
+            const angle = (2 * Math.PI * i) / catKeys.length - Math.PI / 2;
+            catCenters[cat] = { x: Math.cos(angle) * spreadRadius, y: Math.sin(angle) * spreadRadius };
+        });
+        // Track per-category article index for spiral placement
+        const catArticleIndex = {};
+        catKeys.forEach(cat => { catArticleIndex[cat] = 0; });
+
         // Add Article Nodes (No Category Hub Nodes to reflect pure Obsidian structure!)
         items.forEach(article => {
             const catId = article.category || "기획론";
@@ -739,6 +751,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const catColor = isLight ? catMeta.colorLight : catMeta.color;
             const isFocused = (article.id === focusedArticleId);
             const isSameCat = (catId === focusedCatId);
+
+            // Calculate spread position: spiral around category center
+            const center = catCenters[catId] || { x: 0, y: 0 };
+            const idx = catArticleIndex[catId] || 0;
+            catArticleIndex[catId] = idx + 1;
+            const spiralAngle = idx * 0.8;
+            const spiralRadius = 60 + idx * 25;
+            const nodeX = center.x + Math.cos(spiralAngle) * spiralRadius;
+            const nodeY = center.y + Math.sin(spiralAngle) * spiralRadius;
 
             if (isFocused) {
                 // Massive Centered Hero Node (Main Center Node)
@@ -758,10 +779,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             border: isLight ? '#0f172a' : '#ffffff'
                         }
                     },
-                    size: 4, // Smaller hero sphere to match Obsidian style
-                    mass: 3.5, // High mass pulls other nodes visually and structurally
+                    size: 4,
+                    mass: 3.5,
                     font: { size: 12, bold: true, color: catFontColor, face: 'Outfit' },
-                    shadow: { enabled: true, color: catMeta.shadow, size: 25 }
+                    shadow: { enabled: true, color: catMeta.shadow, size: 25 },
+                    x: nodeX,
+                    y: nodeY
                 });
             } else {
                 // Regular Article Nodes
@@ -823,7 +846,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     },
                     size: nodeSize,
-                    font: { size: nodeFontSize, color: nodeFontColor, face: 'Outfit' }
+                    font: { size: nodeFontSize, color: nodeFontColor, face: 'Outfit' },
+                    x: nodeX,
+                    y: nodeY
                 });
             }
         });
