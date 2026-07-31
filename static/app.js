@@ -1088,16 +1088,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 enabled: true,
                 solver: 'forceAtlas2Based',
                 forceAtlas2Based: {
-                    gravitationalConstant: -60,
-                    centralGravity: 0.005,
-                    springLength: 120,
-                    springConstant: 0.08,
-                    damping: 0.4,
-                    avoidOverlap: 0.8
+                    gravitationalConstant: -180, // Stronger inter-cluster repulsion to push groups apart
+                    centralGravity: 0.003,      // Subtle central pull to keep overall map centered
+                    springLength: 160,          // Spaced connections
+                    springConstant: 0.05,       // Soft springs for organic cluster boundaries
+                    damping: 0.5,
+                    avoidOverlap: 1.0           // Maximum node overlap prevention
                 },
                 stabilization: {
                     enabled: true,
-                    iterations: 200,
+                    iterations: 250,
                     fit: true
                 }
             }
