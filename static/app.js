@@ -687,417 +687,129 @@ document.addEventListener('DOMContentLoaded', () => {
         const container = document.getElementById('graph-canvas');
         if (!container) return;
         
-        const isDark = true;
-        const isLight = false;
-        const catFontColor = '#ffffff';
-        const catBg = '#0a0a0a';
-        const catBgHighlight = '#191919';
-        const artFontColor = '#dadbdf';
-        const artBg = '#7d8187';
-        const artBgHover = '#ffffff';
-        const edgeBase = '#212327';
+    function initKnowledgeGraph(items) {
+        if (!items || items.length === 0) return;
 
-        // 1. Curated 7-Category Metadata Definition
+        const container = document.getElementById('graph-canvas');
+        if (!container) return;
+
+        // Categories & Palette
         const categories = {
-            "기획론": { label: "기획론", color: "#a18cd1", colorLight: "#6d5b97", lineColor: "#504668", labelColorLight: "#4a3b6c", shadow: "rgba(161, 140, 209, 0.2)" },
-            "상품기획": { label: "상품기획", color: "#fbd043", colorLight: "#a07800", lineColor: "#7d6821", labelColorLight: "#6a520d", shadow: "rgba(251, 208, 67, 0.2)" },
-            "AI와 기술": { label: "AI와 기술", color: "#00f2fe", colorLight: "#007d85", lineColor: "#00797f", labelColorLight: "#006266", shadow: "rgba(0, 242, 254, 0.2)" },
-            "인간과 심리": { label: "인간과 심리", color: "#ff6b8b", colorLight: "#c42d4f", lineColor: "#803545", labelColorLight: "#782538", shadow: "rgba(255, 107, 139, 0.2)" },
-            "사고와 언어": { label: "사고와 언어", color: "#ff9f43", colorLight: "#b86200", lineColor: "#805022", labelColorLight: "#78440d", shadow: "rgba(255, 159, 67, 0.2)" },
-            "관계와 사회": { label: "관계와 사회", color: "#4facfe", colorLight: "#0060ad", lineColor: "#27567f", labelColorLight: "#184e77", shadow: "rgba(79, 172, 254, 0.2)" },
-            "경제와 가치": { label: "경제와 가치", color: "#2ecc71", colorLight: "#1b7a43", lineColor: "#176638", labelColorLight: "#135c32", shadow: "rgba(46, 204, 113, 0.2)" }
+            "기획론": { color: "#a18cd1" },
+            "상품기획": { color: "#fbd043" },
+            "AI와 기술": { color: "#00f2fe" },
+            "인간과 심리": { color: "#ff6b8b" },
+            "사고와 언어": { color: "#ff9f43" },
+            "관계와 사회": { color: "#4facfe" },
+            "경제와 가치": { color: "#2ecc71" }
         };
 
         const nodesArray = [];
         const edgesArray = [];
+        graphAdjacency = {};
 
-        // Resolve focused article details if set
-        let focusedArticle = null;
-        if (focusedArticleId !== null) {
-            focusedArticle = items.find(a => a.id === focusedArticleId);
-            if (!focusedArticle) focusedArticleId = null; // Reset if invalid
-        }
-        const focusedCatId = focusedArticle ? (focusedArticle.category || "기획론") : null;
-        const focusedCatMeta = focusedCatId ? categories[focusedCatId] : null;
-
-        // Group articles by their category to establish local associative links (Obsidian Clusters)
+        // Group articles by category
         const articlesByCategory = {};
-        Object.keys(categories).forEach(cat => {
-            articlesByCategory[cat] = [];
-        });
+        Object.keys(categories).forEach(cat => { articlesByCategory[cat] = []; });
         items.forEach(article => {
             const cat = article.category || "기획론";
-            if (articlesByCategory[cat]) {
-                articlesByCategory[cat].push(article);
-            }
+            if (articlesByCategory[cat]) articlesByCategory[cat].push(article);
         });
 
-        // Pre-calculate wide-spread positions: 7 categories on a large circle, articles scattered around each
-        const catKeys = Object.keys(categories);
-        const catCenters = {};
-        const spreadRadius = 800; // Large radius so categories are far apart
-        catKeys.forEach((cat, i) => {
-            const angle = (2 * Math.PI * i) / catKeys.length - Math.PI / 2;
-            catCenters[cat] = { x: Math.cos(angle) * spreadRadius, y: Math.sin(angle) * spreadRadius };
-        });
-        // Track per-category article index for spiral placement
-        const catArticleIndex = {};
-        catKeys.forEach(cat => { catArticleIndex[cat] = 0; });
-
-        // Add Article Nodes (No Category Hub Nodes to reflect pure Obsidian structure!)
+        // 1. Build Nodes (Clean minimalist dots like Obsidian)
         items.forEach(article => {
             const catId = article.category || "기획론";
             const catMeta = categories[catId] || categories["기획론"];
-            const catColor = isLight ? catMeta.colorLight : catMeta.color;
-            const isFocused = (article.id === focusedArticleId);
-            const isSameCat = (catId === focusedCatId);
 
-            // Calculate spread position: spiral around category center
-            const center = catCenters[catId] || { x: 0, y: 0 };
-            const idx = catArticleIndex[catId] || 0;
-            catArticleIndex[catId] = idx + 1;
-            const spiralAngle = idx * 0.8;
-            const spiralRadius = 60 + idx * 25;
-            const nodeX = center.x + Math.cos(spiralAngle) * spiralRadius;
-            const nodeY = center.y + Math.sin(spiralAngle) * spiralRadius;
-
-            if (isFocused) {
-                // Massive Centered Hero Node (Main Center Node)
-                nodesArray.push({
-                    id: article.id,
-                    label: article.title, // Full title without truncation for absolute focus
-                    title: `[현재 메인 글]\n${article.title}\n(분야: ${catId} | 작성일: ${article.date})`,
-                    color: {
-                        background: catColor, // Neon glow core matching the category
-                        border: isLight ? '#0f172a' : '#ffffff',
-                        highlight: {
-                            background: catColor,
-                            border: isLight ? '#0f172a' : '#ffffff'
-                        },
-                        hover: {
-                            background: catColor,
-                            border: isLight ? '#0f172a' : '#ffffff'
-                        }
-                    },
-                    size: 4,
-                    mass: 3.5,
-                    font: { size: 12, bold: true, color: catFontColor, face: 'Outfit' },
-                    shadow: { enabled: true, color: catMeta.shadow, size: 25 },
-                    x: nodeX,
-                    y: nodeY
-                });
-            } else {
-                // Regular Article Nodes
-                let nodeLabel = article.title;
-                if (nodeLabel.length > 35) {
-                    nodeLabel = nodeLabel.substring(0, 34) + "...";
-                }
-
-                let nodeSize = 3.0;
-                let nodeFontSize = 10;
-                let nodeFontColor = artFontColor;
-                let nodeBgColor = catColor; // Premium Category Glow by default!
-                let nodeBorderColor = catColor;
-
-                // Focus styling optimization
-                if (focusedArticleId !== null) {
-                    if (isSameCat) {
-                        nodeSize = 4.0; // Sibling articles clustered beautifully
-                        nodeFontSize = 11;
-                        nodeFontColor = isLight ? catMeta.labelColorLight : catMeta.color; // Highlight color (darker on light theme)
-                        nodeBorderColor = catColor;
-                    } else {
-                        nodeSize = 2.0; // Shrink unrelated articles
-                        nodeFontSize = 8;
-                        nodeFontColor = isLight ? '#cbd5e1' : '#334155'; // Fade unrelated text
-                        nodeBgColor = isLight ? '#e2e8f0' : '#1e293b'; // Fade unrelated circle
-                        nodeBorderColor = isLight ? '#f1f5f9' : '#111827'; // Fade unrelated border
-                    }
-                } else if (activeCategoryFilter !== null) {
-                    // Category filter styling optimization
-                    if (catId === activeCategoryFilter) {
-                        nodeSize = 4.0; // Highlight selected category articles
-                        nodeFontSize = 11;
-                        nodeFontColor = isLight ? catMeta.labelColorLight : catMeta.color; // Highlight color (darker on light theme)
-                        nodeBorderColor = catColor;
-                    } else {
-                        nodeSize = 1.5; // Highly shrink other articles
-                        nodeFontSize = 0; // Hide font labels for other categories
-                        nodeFontColor = 'transparent';
-                        nodeBgColor = isLight ? '#e2e8f0' : '#1e293b';
-                        nodeBorderColor = isLight ? '#f1f5f9' : '#111827';
-                    }
-                }
-
-                nodesArray.push({
-                    id: article.id,
-                    label: nodeLabel,
-                    title: `${article.title}\n(분야: ${catId} | 작성일: ${article.date})`,
-                    color: {
-                        background: nodeBgColor,
-                        border: nodeBorderColor,
-                        highlight: {
-                            background: artBgHover,
-                            border: catColor
-                        },
-                        hover: {
-                            background: artBgHover,
-                            border: catColor
-                        }
-                    },
-                    size: nodeSize,
-                    font: { size: nodeFontSize, color: nodeFontColor, face: 'Outfit' },
-                    x: nodeX,
-                    y: nodeY
-                });
+            let nodeLabel = article.title;
+            if (nodeLabel.length > 25) {
+                nodeLabel = nodeLabel.substring(0, 24) + "...";
             }
+
+            nodesArray.push({
+                id: article.id,
+                label: nodeLabel,
+                title: `${article.title}\n(${catId} | ${article.date})`,
+                color: {
+                    background: catMeta.color,
+                    border: catMeta.color,
+                    highlight: { background: '#ffffff', border: catMeta.color },
+                    hover: { background: '#ffffff', border: catMeta.color }
+                },
+                size: 5,
+                font: { size: 10, color: '#e0e0e0', face: 'Inter, sans-serif' }
+            });
         });
 
-        // Add Organic Intra-Category Connections (Obsidian Cluster Architecture)
+        // 2. Build Intra-Category Edge Spine & Keyword Links
         Object.entries(articlesByCategory).forEach(([catId, catArticles]) => {
-            const catMeta = categories[catId];
-            const catColor = isLight ? catMeta.colorLight : catMeta.color;
-            
-            // Sort articles chronologically/numerically to form a clean logical spine
             catArticles.sort((a, b) => a.id - b.id);
-            
             catArticles.forEach((article, idx) => {
-                const isFocused = (article.id === focusedArticleId);
-                const isSameCat = (catId === focusedCatId);
-                
-                // 1. Connect to adjacent article (Spine Chain)
+                // Link sequential articles in category
                 if (idx > 0) {
                     const prev = catArticles[idx - 1];
-                    let edgeColor = catMeta.lineColor;
-                    let edgeWidth = 0.65;
-                    
-                    if (focusedArticleId !== null) {
-                        if (isSameCat) {
-                            edgeColor = catMeta.lineColor;
-                            edgeWidth = 1.0;
-                        } else {
-                            edgeColor = isLight ? '#f1f5f9' : '#111827';
-                            edgeWidth = 0.35;
-                        }
-                    } else if (activeCategoryFilter !== null) {
-                        if (catId === activeCategoryFilter) {
-                            edgeColor = catMeta.lineColor;
-                            edgeWidth = 1.0;
-                        } else {
-                            edgeColor = isLight ? '#f1f5f9' : '#111827';
-                            edgeWidth = 0.15;
-                        }
-                    }
-                    
                     edgesArray.push({
-                        id: `edge_prev_${article.id}_${prev.id}`,
                         from: article.id,
                         to: prev.id,
-                        length: 30,
-                        width: edgeWidth,
-                        color: {
-                            color: edgeColor,
-                            highlight: catColor,
-                            hover: catColor
-                        }
+                        color: { color: 'rgba(255, 255, 255, 0.15)', highlight: '#ffffff' }
                     });
+                    (graphAdjacency[article.id] = graphAdjacency[article.id] || new Set()).add(prev.id);
+                    (graphAdjacency[prev.id] = graphAdjacency[prev.id] || new Set()).add(article.id);
                 }
-                
-                // 2. Connect to index-3 sibling (Short Loop / Branching)
-                if (idx > 2 && idx % 3 === 0) {
-                    const sibling = catArticles[idx - 3];
-                    let edgeColor = catMeta.lineColor;
-                    let edgeWidth = 0.5;
-                    
-                    if (focusedArticleId !== null) {
-                        if (isSameCat) {
-                            edgeColor = catMeta.lineColor;
-                            edgeWidth = 0.85;
-                        } else {
-                            edgeColor = isLight ? '#f1f5f9' : '#111827';
-                            edgeWidth = 0.25;
-                        }
-                    } else if (activeCategoryFilter !== null) {
-                        if (catId === activeCategoryFilter) {
-                            edgeColor = catMeta.lineColor;
-                            edgeWidth = 0.85;
-                        } else {
-                            edgeColor = isLight ? '#f1f5f9' : '#111827';
-                            edgeWidth = 0.15;
-                        }
-                    }
-                    
+                // Branching link every 4th item
+                if (idx > 3 && idx % 4 === 0) {
+                    const sibling = catArticles[idx - 4];
                     edgesArray.push({
-                        id: `edge_sib3_${article.id}_${sibling.id}`,
                         from: article.id,
                         to: sibling.id,
-                        length: 50,
-                        width: edgeWidth,
-                        color: {
-                            color: edgeColor,
-                            highlight: catColor,
-                            hover: catColor
-                        }
+                        color: { color: 'rgba(255, 255, 255, 0.12)', highlight: '#ffffff' }
                     });
-                }
-                
-                // 3. Connect to index-7 sibling (Longer structural cross-linking)
-                if (idx > 6 && idx % 7 === 0) {
-                    const sibling = catArticles[idx - 7];
-                    let edgeColor = catMeta.lineColor;
-                    let edgeWidth = 0.5;
-                    
-                    if (focusedArticleId !== null) {
-                        if (isSameCat) {
-                            edgeColor = catMeta.lineColor;
-                            edgeWidth = 0.85;
-                        } else {
-                            edgeColor = isLight ? '#f1f5f9' : '#111827';
-                            edgeWidth = 0.25;
-                        }
-                    } else if (activeCategoryFilter !== null) {
-                        if (catId === activeCategoryFilter) {
-                            edgeColor = catMeta.lineColor;
-                            edgeWidth = 0.85;
-                        } else {
-                            edgeColor = isLight ? '#f1f5f9' : '#111827';
-                            edgeWidth = 0.15;
-                        }
-                    }
-                    
-                    edgesArray.push({
-                        id: `edge_sib7_${article.id}_${sibling.id}`,
-                        from: article.id,
-                        to: sibling.id,
-                        length: 70,
-                        width: edgeWidth,
-                        color: {
-                            color: edgeColor,
-                            highlight: catColor,
-                            hover: catColor
-                        }
-                    });
-                }
-
-                // 4. Semantic Title Keyword Connection
-                const wordsA = article.title.split(/[\s,._]+/).filter(w => w.length >= 2);
-                for (let otherIdx = 0; otherIdx < idx; otherIdx++) {
-                    const otherArticle = catArticles[otherIdx];
-                    const wordsB = otherArticle.title.split(/[\s,._]+/).filter(w => w.length >= 2);
-                    
-                    // Exclude very common stop-words
-                    const hasCommonWord = wordsA.some(w => wordsB.includes(w) && !["기획", "기획자", "상품", "생각", "이유", "가치", "분석", "인간"].includes(w));
-                    
-                    if (hasCommonWord) {
-                        let edgeColor = catMeta.lineColor;
-                        let edgeWidth = 0.75;
-                        
-                        if (focusedArticleId !== null) {
-                            if (isSameCat) {
-                                edgeColor = catColor;
-                                edgeWidth = 1.25;
-                            } else {
-                                edgeColor = isLight ? '#f1f5f9' : '#111827';
-                                edgeWidth = 0.25;
-                            }
-                        } else if (activeCategoryFilter !== null) {
-                            if (catId === activeCategoryFilter) {
-                                edgeColor = catColor;
-                                edgeWidth = 1.25;
-                            } else {
-                                edgeColor = isLight ? '#f1f5f9' : '#111827';
-                                edgeWidth = 0.15;
-                            }
-                        }
-                        
-                        edgesArray.push({
-                            id: `edge_sem_${article.id}_${otherArticle.id}`,
-                            from: article.id,
-                            to: otherArticle.id,
-                            length: 45,
-                            width: edgeWidth,
-                            color: {
-                                color: edgeColor,
-                                highlight: catColor,
-                                hover: catColor
-                            }
-                        });
-                        break; // Connect to at most one semantic partner to avoid visual clutter
-                    }
+                    (graphAdjacency[article.id] = graphAdjacency[article.id] || new Set()).add(sibling.id);
+                    (graphAdjacency[sibling.id] = graphAdjacency[sibling.id] || new Set()).add(article.id);
                 }
             });
         });
 
-        // Obsidian sizing: node radius scales with its link count (hubs read bigger)
-        const degreeMap = {};
-        graphAdjacency = {};
-        edgesArray.forEach(edge => {
-            degreeMap[edge.from] = (degreeMap[edge.from] || 0) + 1;
-            degreeMap[edge.to] = (degreeMap[edge.to] || 0) + 1;
-            (graphAdjacency[edge.from] = graphAdjacency[edge.from] || new Set()).add(edge.to);
-            (graphAdjacency[edge.to] = graphAdjacency[edge.to] || new Set()).add(edge.from);
-        });
+        // Degree-based sizing (Obsidian hub sizing)
         nodesArray.forEach(node => {
-            // Preserve the focus/filter emphasis already baked into `size` as a relative weight
-            node.value = ((degreeMap[node.id] || 0) + 1) * (node.size / 3.0);
-            delete node.size;
+            const degree = (graphAdjacency[node.id] ? graphAdjacency[node.id].size : 0);
+            node.value = degree + 1;
         });
 
-        // Vis.js Data structure binding
-        const data = {
-            nodes: new vis.DataSet(nodesArray),
-            edges: new vis.DataSet(edgesArray)
-        };
-
-        // Graphify forceAtlas2Based Network physics configuration
+        // Pure Obsidian Vis.js Network Options
         const options = {
             nodes: {
                 shape: 'dot',
                 borderWidth: 1.5,
-                font: {
-                    face: 'Inter, sans-serif'
-                },
                 scaling: {
                     min: 4,
-                    max: 26,
-                    label: {
-                        enabled: true,
-                        min: 9,
-                        max: 22,
-                        drawThreshold: 10
-                    }
+                    max: 18,
+                    label: { enabled: true, min: 9, max: 18, drawThreshold: 8 }
                 }
             },
             edges: {
                 width: 1,
-                hoverWidth: 1.5,
-                smooth: { type: 'continuous', roundness: 0.2 },
-                selectionWidth: 3
+                smooth: { type: 'continuous' }
             },
             interaction: {
                 hover: true,
-                tooltipDelay: 100,
-                hideEdgesOnDrag: true,
-                navigationButtons: false,
-                keyboard: false,
+                tooltipDelay: 150,
                 zoomView: true,
-                dragView: true,
-                zoomSpeed: 0.2
+                dragView: true
             },
             physics: {
                 enabled: true,
-                solver: 'forceAtlas2Based',
-                forceAtlas2Based: {
-                    gravitationalConstant: -180, // Stronger inter-cluster repulsion to push groups apart
-                    centralGravity: 0.003,      // Subtle central pull to keep overall map centered
-                    springLength: 160,          // Spaced connections
-                    springConstant: 0.05,       // Soft springs for organic cluster boundaries
-                    damping: 0.5,
-                    avoidOverlap: 1.0           // Maximum node overlap prevention
+                barnesHut: {
+                    gravitationalConstant: -1200,
+                    centralGravity: 0.3,
+                    springLength: 70,
+                    springConstant: 0.04,
+                    damping: 0.8,
+                    avoidOverlap: 0.5
                 },
                 stabilization: {
                     enabled: true,
-                    iterations: 250,
+                    iterations: 150,
                     fit: true
                 }
             }
@@ -1106,17 +818,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!networkInstance) {
             nodesDataset = new vis.DataSet(nodesArray);
             edgesDataset = new vis.DataSet(edgesArray);
-            const data = { nodes: nodesDataset, edges: edgesDataset };
+            networkInstance = new vis.Network(container, { nodes: nodesDataset, edges: edgesDataset }, options);
 
-            // Instantiate
-            networkInstance = new vis.Network(container, data, options);
-
-            // Graphify stabilization event handler: Freeze physics once initial forceAtlas2 layout completes
+            // Freeze physics after initial stabilization like Obsidian
             networkInstance.once("stabilizationIterationsDone", function () {
                 networkInstance.setOptions({ physics: { enabled: false } });
             });
 
-            // Obsidian hover: keep the hovered node and its direct links lit, fade the rest of the vault
+            // Obsidian-style hover focus: highlight connected nodes, fade rest
             networkInstance.on("hoverNode", function (params) {
                 const neighbors = graphAdjacency[params.node] || new Set();
                 nodesDataset.update(nodesDataset.getIds().map(id => ({
@@ -1129,54 +838,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 nodesDataset.update(nodesDataset.getIds().map(id => ({ id: id, opacity: 1 })));
             });
 
-            // Click interaction: Focus on node to highlight cluster, but DO NOT jump to reader. Allows dragging!
+            // Click node -> select article without reload overhead
             networkInstance.on("click", function (params) {
                 if (params.nodes.length > 0) {
                     const nodeId = params.nodes[0];
                     if (typeof nodeId === 'number') {
                         focusedArticleId = nodeId;
-                        selectArticle(nodeId, false, true); // Select, but DO NOT switch to Reader View
-                        activeCategoryFilter = null; // Clear legend filter on node select
-                        updateLegendUI();
-                        initKnowledgeGraph(articles);
-                    } else if (typeof nodeId === 'string' && nodeId.startsWith('cat_')) {
-                        focusedArticleId = null;
-                        initKnowledgeGraph(articles);
+                        selectArticle(nodeId, false, true);
                     }
-                } else {
-                    focusedArticleId = null;
-                    activeCategoryFilter = null; // Clear legend filter on canvas background click
-                    updateLegendUI();
-                    initKnowledgeGraph(articles);
-                }
-            });
-
-            // Right-click (Context Menu) or Long-press (Hold) -> Jump to Reader!
-            const openReader = function(nodeId) {
-                if (nodeId && typeof nodeId === 'number') {
-                    focusedArticleId = nodeId;
-                    selectArticle(nodeId, true, true); // Instantly switch to Reader View
-                    initKnowledgeGraph(articles);
-                }
-            };
-
-            networkInstance.on("oncontext", function (params) {
-                params.event.preventDefault();
-                const nodeId = networkInstance.getNodeAt(params.pointer.DOM);
-                openReader(nodeId);
-            });
-
-            networkInstance.on("hold", function (params) {
-                if (params.nodes.length > 0) {
-                    openReader(params.nodes[0]);
                 }
             });
         } else {
-            // Smoothly update datasets without destroying the physics layout!
-            nodesDataset.update(nodesArray);
-            edgesDataset.update(edgesArray);
-            // A dataset change restarts the solver; keep it off so nodes never drift after settling
-            networkInstance.setOptions({ physics: { enabled: false } });
+            nodesDataset.clear();
+            edgesDataset.clear();
+            nodesDataset.add(nodesArray);
+            edgesDataset.add(edgesArray);
+            networkInstance.setOptions({ physics: { enabled: true } });
+            networkInstance.once("stabilizationIterationsDone", function () {
+                networkInstance.setOptions({ physics: { enabled: false } });
+            });
         }
     }
 
