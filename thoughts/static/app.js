@@ -731,13 +731,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 label: nodeLabel,
                 title: `${article.title}\n(${catId} | ${article.date})`,
                 color: {
-                    background: catMeta.color,
-                    border: catMeta.color,
-                    highlight: { background: '#ffffff', border: catMeta.color },
-                    hover: { background: '#ffffff', border: catMeta.color }
+                    background: '#888888',
+                    border: '#aaaaaa',
+                    highlight: { background: '#ffffff', border: '#ffffff' },
+                    hover: { background: '#ffffff', border: '#ffffff' }
                 },
                 size: 5,
-                font: { size: 10, color: '#e0e0e0', face: 'Inter, sans-serif' }
+                font: { size: 10, color: '#cccccc', face: 'Inter, sans-serif' }
             });
         });
 
@@ -762,7 +762,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     edgesArray.push({
                         from: article.id,
                         to: sibling.id,
-                        color: { color: 'rgba(255, 255, 255, 0.12)', highlight: '#ffffff' }
+                        color: { color: 'rgba(255, 255, 255, 0.10)', highlight: '#ffffff' }
                     });
                     (graphAdjacency[article.id] = graphAdjacency[article.id] || new Set()).add(sibling.id);
                     (graphAdjacency[sibling.id] = graphAdjacency[sibling.id] || new Set()).add(article.id);
