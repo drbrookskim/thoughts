@@ -630,6 +630,11 @@ html, body {
     margin: 0;
 }
 
+/* Hide duplicated first h1 title inside body since viewer-header already renders the title */
+.markdown-body > h1:first-child {
+    display: none;
+}
+
 .markdown-body h1 {
     font-size: 48px;
     font-weight: 400;
