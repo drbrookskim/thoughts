@@ -1049,18 +1049,14 @@ document.addEventListener('DOMContentLoaded', () => {
             edges: new vis.DataSet(edgesArray)
         };
 
-        // Obsidian style Force-Directed Network physics configuration
+        // Graphify forceAtlas2Based Network physics configuration
         const options = {
-            layout: {
-                improvedLayout: false // 7 disconnected category clusters defeat this algorithm; vis.js recommends disabling it
-            },
             nodes: {
                 shape: 'dot',
-                font: {
-                    face: 'Outfit'
-                },
                 borderWidth: 1.5,
-                borderWidthSelected: 2.5,
+                font: {
+                    face: 'Inter, sans-serif'
+                },
                 scaling: {
                     min: 4,
                     max: 26,
@@ -1068,7 +1064,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         enabled: true,
                         min: 9,
                         max: 22,
-                        // Obsidian hides labels until you zoom in far enough to read them
                         drawThreshold: 10
                     }
                 }
@@ -1076,16 +1071,36 @@ document.addEventListener('DOMContentLoaded', () => {
             edges: {
                 width: 1,
                 hoverWidth: 1.5,
-                smooth: false
+                smooth: { type: 'continuous', roundness: 0.2 },
+                selectionWidth: 3
             },
             interaction: {
                 hover: true,
-                tooltipDelay: 150,
+                tooltipDelay: 100,
+                hideEdgesOnDrag: true,
+                navigationButtons: false,
+                keyboard: false,
                 zoomView: true,
                 dragView: true,
-                zoomSpeed: 0.2 // Slow down mouse scroll zoom speed by 80% for smooth camera drifts
+                zoomSpeed: 0.2
             },
-            physics: false
+            physics: {
+                enabled: true,
+                solver: 'forceAtlas2Based',
+                forceAtlas2Based: {
+                    gravitationalConstant: -60,
+                    centralGravity: 0.005,
+                    springLength: 120,
+                    springConstant: 0.08,
+                    damping: 0.4,
+                    avoidOverlap: 0.8
+                },
+                stabilization: {
+                    enabled: true,
+                    iterations: 200,
+                    fit: true
+                }
+            }
         };
 
         if (!networkInstance) {
@@ -1096,7 +1111,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // Instantiate
             networkInstance = new vis.Network(container, data, options);
 
-            // Physics is off — nodes are statically placed, no floating or drifting
+            // Graphify stabilization event handler: Freeze physics once initial forceAtlas2 layout completes
+            networkInstance.once("stabilizationIterationsDone", function () {
+                networkInstance.setOptions({ physics: { enabled: false } });
+            });
 
             // Obsidian hover: keep the hovered node and its direct links lit, fade the rest of the vault
             networkInstance.on("hoverNode", function (params) {
