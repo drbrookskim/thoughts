@@ -1,12 +1,64 @@
 /* ==========================================================================
-   ⚡ xAI-INSPIRED DESIGN SYSTEM (Frontier Dark Aesthetic)
-   Inspired by xAI Design Spec (x-ai-DESIGN.md)
+   🎙️ ELEVENLABS & xAI HYBRID DESIGN SYSTEM
+   Supports Light Mode (ElevenLabs Off-White Editorial) & Dark Mode (xAI Frontier Dark)
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&family=Noto+Sans+KR:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&family=Noto+Sans+KR:wght@300;400;500;600&family=Waldenburg:wght@300;400;500&display=swap');
 
 :root {
-    /* 🎨 Colors */
+    /* 🎨 Default Light Mode (ElevenLabs Editorial Canvas) */
+    --color-primary: #292524;
+    --color-on-primary: #ffffff;
+    --color-ink: #0c0a09;
+    --color-body: #4e4e4e;
+    --color-body-mid: #777169;
+    --color-mute: #777169;
+    --color-hairline: #e7e5e4;
+    
+    --color-canvas: #f5f5f5;
+    --color-canvas-soft: #fafafa;
+    --color-canvas-card: #ffffff;
+    --color-canvas-mid: #f0efed;
+
+    /* Atmospheric Gradient Orbs (ElevenLabs Signature) */
+    --gradient-mint: #a7e5d3;
+    --gradient-peach: #f4c5a8;
+    --gradient-lavender: #c8b8e0;
+    --gradient-sky: #a8c8e8;
+    --gradient-rose: #e8b8c4;
+
+    /* 📐 Functional Tokens - Light */
+    --bg-base: #f5f5f5;
+    --bg-surface: #ffffff;
+    --bg-surface-hover: #f0efed;
+    --bg-input: #ffffff;
+
+    --border-hairline: #e7e5e4;
+    --border-pill: #d6d3d1;
+    --border-pill-hover: #292524;
+
+    --text-primary: #0c0a09;
+    --text-body: #4e4e4e;
+    --text-secondary: #777169;
+    --text-tertiary: #a8a29e;
+    --text-inverse: #ffffff;
+
+    /* ⭕ Shapes & Radii (ElevenLabs Pill + Rounded Card) */
+    --radius-none: 0px;
+    --radius-sm: 8px;
+    --radius-card: 16px;
+    --radius-pill: 9999px;
+    --radius-full: 9999px;
+
+    /* ⚡ Typography */
+    --font-display: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    --font-serif: 'Waldenburg', 'Times New Roman', serif;
+    --transition-smooth: all 0.2s ease-in-out;
+}
+
+/* 🌙 Dark Mode (xAI Frontier Canvas) */
+body.theme-dark, :root.theme-dark {
     --color-primary: #ffffff;
     --color-on-primary: #0a0a0a;
     --color-ink: #ffffff;
@@ -20,14 +72,6 @@
     --color-canvas-card: #191919;
     --color-canvas-mid: #363a3f;
 
-    /* Accents */
-    --color-accent-sunset: #ff7a17;
-    --color-accent-sunset-soft: #ffc285;
-    --color-accent-dusk: #7c3aed;
-    --color-accent-twilight: #c4b5fd;
-    --color-accent-breeze: #a0c3ec;
-
-    /* 📐 Functional Tokens */
     --bg-base: #0a0a0a;
     --bg-surface: #191919;
     --bg-surface-hover: #1a1c20;
@@ -42,28 +86,6 @@
     --text-secondary: #7d8187;
     --text-tertiary: #7d8187;
     --text-inverse: #0a0a0a;
-
-    /* ⭕ Shapes & Radii */
-    --radius-none: 0px;
-    --radius-sm: 8px;
-    --radius-card: 8px;
-    --radius-pill: 9999px;
-    --radius-full: 9999px;
-
-    /* ⚡ Typography */
-    --font-display: 'Inter', system-ui, -apple-system, sans-serif;
-    --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
-    --transition-smooth: all 0.2s ease-in-out;
-}
-
-/* Dark mode forced (xAI is dark-canvas only) */
-body.theme-dark, :root.theme-dark {
-    --bg-base: #0a0a0a;
-    --bg-surface: #191919;
-    --bg-surface-hover: #1a1c20;
-    --border-hairline: #212327;
-    --text-primary: #ffffff;
-    --text-body: #dadbdf;
 }
 
 /* Base Resets */

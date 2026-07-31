@@ -18,9 +18,12 @@
     <link rel="stylesheet" href="./static/style.css?v=20260730-xai-v2">
     <script>
         (function() {
-            // Default xAI theme is dark canvas
-            localStorage.setItem('drbrooks-theme', 'dark');
-            document.documentElement.classList.add('theme-dark');
+            const savedTheme = localStorage.getItem('drbrooks-theme') || 'light';
+            if (savedTheme === 'dark' || (savedTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('theme-dark');
+            } else {
+                document.documentElement.classList.remove('theme-dark');
+            }
         })();
     </script>
 </head>
