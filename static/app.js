@@ -76,7 +76,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetch and render the list of available articles
     async function loadArticles() {
         try {
-            const response = await fetch('api/articles.json');
+            let response = await fetch('./api/articles.json');
+            if (!response.ok) {
+                response = await fetch('api/articles.json');
+            }
             articles = await response.json();
             
             renderArticlesList(articles);
