@@ -825,6 +825,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 networkInstance.setOptions({ physics: { enabled: false } });
             });
 
+            // Organic Obsidian Drag: temporarily re-enable physics while dragging a node so connected neighbors pull along
+            networkInstance.on("dragStart", function (params) {
+                if (params.nodes.length > 0) {
+                    networkInstance.setOptions({ physics: { enabled: true } });
+                }
+            });
+
+            networkInstance.on("dragEnd", function (params) {
+                // Settle and freeze physics back to static after drag finishes
+                setTimeout(() => {
+                    networkInstance.setOptions({ physics: { enabled: false } });
+                }, 300);
+            });
+
             // Obsidian-style hover focus: highlight connected nodes, fade rest
             networkInstance.on("hoverNode", function (params) {
                 const neighbors = graphAdjacency[params.node] || new Set();
