@@ -702,10 +702,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // 🧠 OBSIDIAN KNOWLEDGE GRAPH VIEW ENGINE
     // ==========================================================================
     function initKnowledgeGraph(items) {
-        const container = document.getElementById('graph-canvas');
-        if (!container) return;
-        
-    function initKnowledgeGraph(items) {
         if (!items || items.length === 0) return;
 
         const container = document.getElementById('graph-canvas');
