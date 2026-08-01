@@ -701,11 +701,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================================
     // 🧠 OBSIDIAN KNOWLEDGE GRAPH VIEW ENGINE
     // ==========================================================================
+
+    // Switching physics off makes vis.js re-measure its container, which resizes the
+    // canvas and wipes whatever was drawn. With the simulation stopped nothing repaints
+    // it, so the graph goes blank — redraw right after freezing.
+    function freezeGraphPhysics() {
+        if (!networkInstance) return;
+        networkInstance.setOptions({ physics: { enabled: false } });
+        networkInstance.redraw();
+    }
+
     function initKnowledgeGraph(items) {
         if (!items || items.length === 0) return;
 
         const container = document.getElementById('graph-canvas');
         if (!container) return;
+
+        // Monochrome palette, flipped for the light canvas. The dark values wash out
+        // completely on the light theme — white edges become invisible.
+        const isDark = document.body.classList.contains('theme-dark');
+        const nodeFill = isDark ? '#888888' : '#9ca3af';
+        const nodeStroke = isDark ? '#aaaaaa' : '#6b7280';
+        const nodeAccent = isDark ? '#ffffff' : '#111827';
+        const labelColor = isDark ? '#cccccc' : '#4b5563';
+        const edgeSpine = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(17, 24, 39, 0.22)';
+        const edgeBranch = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(17, 24, 39, 0.14)';
 
         // Categories & Palette
         const categories = {
@@ -745,13 +765,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 label: nodeLabel,
                 title: `${article.title}\n(${catId} | ${article.date})`,
                 color: {
-                    background: '#888888',
-                    border: '#aaaaaa',
-                    highlight: { background: '#ffffff', border: '#ffffff' },
-                    hover: { background: '#ffffff', border: '#ffffff' }
+                    background: nodeFill,
+                    border: nodeStroke,
+                    highlight: { background: nodeAccent, border: nodeAccent },
+                    hover: { background: nodeAccent, border: nodeAccent }
                 },
                 size: 5,
-                font: { size: 10, color: '#cccccc', face: 'Inter, sans-serif' }
+                font: { size: 10, color: labelColor, face: 'Inter, sans-serif' }
             });
         });
 
@@ -765,7 +785,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     edgesArray.push({
                         from: article.id,
                         to: prev.id,
-                        color: { color: 'rgba(255, 255, 255, 0.15)', highlight: '#ffffff' }
+                        color: { color: edgeSpine, highlight: nodeAccent }
                     });
                     (graphAdjacency[article.id] = graphAdjacency[article.id] || new Set()).add(prev.id);
                     (graphAdjacency[prev.id] = graphAdjacency[prev.id] || new Set()).add(article.id);
@@ -776,7 +796,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     edgesArray.push({
                         from: article.id,
                         to: sibling.id,
-                        color: { color: 'rgba(255, 255, 255, 0.10)', highlight: '#ffffff' }
+                        color: { color: edgeBranch, highlight: nodeAccent }
                     });
                     (graphAdjacency[article.id] = graphAdjacency[article.id] || new Set()).add(sibling.id);
                     (graphAdjacency[sibling.id] = graphAdjacency[sibling.id] || new Set()).add(article.id);
@@ -792,6 +812,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Pure Obsidian Vis.js Network Options
         const options = {
+            layout: {
+                // The 7 category clusters are disconnected from each other, which this
+                // algorithm cannot position — vis.js logs a warning and stalls before the
+                // first draw. Disabling it lets stabilization run and paint.
+                improvedLayout: false
+            },
             nodes: {
                 shape: 'dot',
                 borderWidth: 1.5,
@@ -835,9 +861,7 @@ document.addEventListener('DOMContentLoaded', () => {
             networkInstance = new vis.Network(container, { nodes: nodesDataset, edges: edgesDataset }, options);
 
             // Freeze physics after initial stabilization like Obsidian
-            networkInstance.once("stabilizationIterationsDone", function () {
-                networkInstance.setOptions({ physics: { enabled: false } });
-            });
+            networkInstance.once("stabilizationIterationsDone", freezeGraphPhysics);
 
             // Organic Obsidian Drag: temporarily re-enable physics while dragging a node so connected neighbors pull along
             networkInstance.on("dragStart", function (params) {
@@ -848,9 +872,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             networkInstance.on("dragEnd", function (params) {
                 // Settle and freeze physics back to static after drag finishes
-                setTimeout(() => {
-                    networkInstance.setOptions({ physics: { enabled: false } });
-                }, 300);
+                setTimeout(freezeGraphPhysics, 300);
             });
 
             // Obsidian-style hover focus: highlight connected nodes, fade rest
@@ -882,9 +904,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nodesDataset.add(nodesArray);
             edgesDataset.add(edgesArray);
             networkInstance.setOptions({ physics: { enabled: true } });
-            networkInstance.once("stabilizationIterationsDone", function () {
-                networkInstance.setOptions({ physics: { enabled: false } });
-            });
+            networkInstance.once("stabilizationIterationsDone", freezeGraphPhysics);
         }
     }
 

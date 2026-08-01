@@ -763,6 +763,13 @@ html, body {
     height: 100%;
 }
 
+/* vis.js injects an inline canvas; the inline baseline gap makes this box a few px
+   taller than the canvas, so every re-measure grows it again and the resize wipes
+   what was drawn. Block layout removes the gap and keeps the drawing on screen. */
+#graph-canvas canvas {
+    display: block;
+}
+
 .graph-legend {
     position: absolute;
     bottom: 24px;
