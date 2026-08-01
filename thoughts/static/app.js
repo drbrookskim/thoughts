@@ -492,7 +492,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabWriteBtn) tabWriteBtn.classList.remove('active');
         graphViewContainer.classList.add('hidden');
         if (writeView) writeView.classList.add('hidden');
-        
+
+        // Nothing to simulate for a hidden graph — stop burning frames while reading
+        freezeGraphPhysics();
+
         if (activeArticleId) {
             articleView.classList.remove('hidden');
             welcomeView.classList.add('hidden');
@@ -705,10 +708,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // Switching physics off makes vis.js re-measure its container, which resizes the
     // canvas and wipes whatever was drawn. With the simulation stopped nothing repaints
     // it, so the graph goes blank — redraw right after freezing.
+    let graphFreezeTimer = null;
+
     function freezeGraphPhysics() {
         if (!networkInstance) return;
+        clearTimeout(graphFreezeTimer);
+        graphFreezeTimer = null;
         networkInstance.setOptions({ physics: { enabled: false } });
         networkInstance.redraw();
+    }
+
+    // "stabilizationIterationsDone" only fires for the very first stabilization run, so a
+    // restart (every graph tab visit re-enables physics) left the solver simulating 189
+    // nodes forever in the background — the whole browser got slower the longer the tab
+    // stayed open. "stabilized" fires each time the solver settles, and the timer caps
+    // layouts that never converge.
+    function settleThenFreezeGraph() {
+        if (!networkInstance) return;
+        clearTimeout(graphFreezeTimer);
+        networkInstance.once("stabilized", freezeGraphPhysics);
+        graphFreezeTimer = setTimeout(freezeGraphPhysics, 4000);
     }
 
     function initKnowledgeGraph(items) {
@@ -861,7 +880,7 @@ document.addEventListener('DOMContentLoaded', () => {
             networkInstance = new vis.Network(container, { nodes: nodesDataset, edges: edgesDataset }, options);
 
             // Freeze physics after initial stabilization like Obsidian
-            networkInstance.once("stabilizationIterationsDone", freezeGraphPhysics);
+            settleThenFreezeGraph();
 
             // Organic Obsidian Drag: temporarily re-enable physics while dragging a node so connected neighbors pull along
             networkInstance.on("dragStart", function (params) {
@@ -904,7 +923,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nodesDataset.add(nodesArray);
             edgesDataset.add(edgesArray);
             networkInstance.setOptions({ physics: { enabled: true } });
-            networkInstance.once("stabilizationIterationsDone", freezeGraphPhysics);
+            settleThenFreezeGraph();
         }
     }
 
