@@ -709,6 +709,37 @@ document.addEventListener('DOMContentLoaded', () => {
     let graphBlurTimer = null;
     let graphDimmed = new Set(); // ids currently faded out by hover focus
     let dragFollowers = null; // node being dragged plus the neighbours trailing it
+    let graphEntranceRaf = null;
+
+    // Obsidian animates its graph into place on open. There is no solver here to produce
+    // that, so the same effect comes from interpolating between the collapsed start
+    // positions and the final ones. Node coordinates are written straight onto the vis
+    // bodies and drawn once per frame — moveNode() would trigger its own redraw per node,
+    // which at 189 nodes a frame is what we removed the physics to avoid.
+    function animateGraphEntrance(startPositions, endPositions) {
+        if (!networkInstance) return;
+        if (graphEntranceRaf) cancelAnimationFrame(graphEntranceRaf);
+        const bodies = networkInstance.body.nodes;
+        const ids = Object.keys(endPositions).filter(id => bodies[id] && startPositions[id]);
+        if (!ids.length) return;
+
+        const DURATION = 700;
+        const t0 = performance.now();
+        const step = (now) => {
+            if (!networkInstance) return;
+            const t = Math.min(1, (now - t0) / DURATION);
+            const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+            ids.forEach(id => {
+                const from = startPositions[id];
+                const to = endPositions[id];
+                bodies[id].x = from.x + (to.x - from.x) * eased;
+                bodies[id].y = from.y + (to.y - from.y) * eased;
+            });
+            networkInstance.redraw();
+            graphEntranceRaf = t < 1 ? requestAnimationFrame(step) : null;
+        };
+        graphEntranceRaf = requestAnimationFrame(step);
+    }
 
     // Centre and zoom the graph from the precomputed node coordinates. vis.fit() kept
     // measuring the canvas before it had its visible size and framed the view off-centre;
@@ -818,6 +849,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const positions = {};
+        const entranceStart = {};
         Object.entries(articlesByCategory).forEach(([catId, catArticles]) => {
             const centre = catCenters[catId] || { x: 0, y: 0 };
             const spread = 34; // gap between neighbouring articles in a cluster
@@ -828,6 +860,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     x: centre.x + Math.cos(theta) * r,
                     y: centre.y + Math.sin(theta) * r
                 };
+                // Each cluster starts collapsed on its own centre and blooms outward.
+                entranceStart[article.id] = { x: centre.x, y: centre.y };
             });
         });
 
@@ -942,6 +976,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Recreating runs the same path as the first build and settles properly in ~1s.
         if (networkInstance) {
             clearTimeout(graphBlurTimer);
+            if (graphEntranceRaf) cancelAnimationFrame(graphEntranceRaf);
+            graphEntranceRaf = null;
             networkInstance.destroy();
             networkInstance = null;
         }
@@ -956,7 +992,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // which repeatedly measured a stale canvas here and left the graph parked in a
             // corner. Hooked to the first paint: setting the camera before that gets
             // overwritten by vis's own initial view.
-            networkInstance.once("afterDrawing", () => frameGraph());
+            networkInstance.once("afterDrawing", () => {
+                frameGraph();
+                animateGraphEntrance(entranceStart, positions);
+            });
 
             // Obsidian drags the neighbourhood along with the node under the cursor. That
             // came from its force solver; here the same feel is produced by moving only the
