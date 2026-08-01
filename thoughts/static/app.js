@@ -75,20 +75,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Fetch and render the list of available articles
     async function loadArticles() {
-        try {
-            let response = await fetch('./api/articles.json');
-            if (!response.ok) {
-                response = await fetch('api/articles.json');
+        const fetchUrls = [
+            'api/articles.json',
+            './api/articles.json',
+            '/thoughts/api/articles.json',
+            `${window.location.pathname.replace(/\/$/, '')}/api/articles.json`
+        ];
+        
+        let loadedData = null;
+        for (const url of fetchUrls) {
+            try {
+                const res = await fetch(url);
+                if (res.ok) {
+                    loadedData = await res.json();
+                    if (Array.isArray(loadedData) && loadedData.length > 0) break;
+                }
+            } catch (e) {
+                // Try next URL fallback
             }
-            articles = await response.json();
-            
+        }
+
+        if (loadedData && Array.isArray(loadedData)) {
+            articles = loadedData;
             renderArticlesList(articles);
             updateStats();
-        } catch (error) {
-            console.error('Error fetching articles:', error);
+        } else {
+            console.error('Error: Could not load articles.json from any known path.');
             articlesList.innerHTML = `
                 <div class="list-placeholder">
-                    <i class="fa-solid fa-triangle-exclamation" style="color: var(--color-error)"></i>
+                    <i class="fa-solid fa-triangle-exclamation" style="color: var(--color-error, #ff4d4f)"></i>
                     <p>목록을 불러오는 데 실패했습니다.</p>
                 </div>
             `;
