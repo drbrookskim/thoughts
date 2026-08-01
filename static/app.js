@@ -477,11 +477,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Always re-initialize the graph to reflect any new article selection focus
         initKnowledgeGraph(articles);
 
-        // Trigger Vis.js dynamic canvas redraw to fix any hidden sizing bugs
+        // The canvas is only sized correctly once the container is visible, so it still
+        // needs a redraw here. Framing is not repeated: frameGraphToBounds already set the
+        // camera, and vis.fit() at this point would measure a stale canvas and undo it.
         if (networkInstance) {
             setTimeout(() => {
+                if (!networkInstance) return;
                 networkInstance.redraw();
-                networkInstance.fit();
+                frameGraph();
             }, 100);
         }
     });
@@ -492,9 +495,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabWriteBtn) tabWriteBtn.classList.remove('active');
         graphViewContainer.classList.add('hidden');
         if (writeView) writeView.classList.add('hidden');
-
-        // Nothing to simulate for a hidden graph — stop burning frames while reading
-        freezeGraphPhysics();
 
         if (activeArticleId) {
             articleView.classList.remove('hidden');
@@ -705,13 +705,35 @@ document.addEventListener('DOMContentLoaded', () => {
     // 🧠 OBSIDIAN KNOWLEDGE GRAPH VIEW ENGINE
     // ==========================================================================
 
-    // Switching physics off makes vis.js re-measure its container, which resizes the
-    // canvas and wipes whatever was drawn. With the simulation stopped nothing repaints
-    // it, so the graph goes blank — redraw right after freezing.
-    let graphFreezeTimer = null;
     let graphSignature = null;
     let graphBlurTimer = null;
     let graphDimmed = new Set(); // ids currently faded out by hover focus
+
+    // Centre and zoom the graph from the precomputed node coordinates. vis.fit() kept
+    // measuring the canvas before it had its visible size and framed the view off-centre;
+    // the bounds are known up front, so the camera can be set directly.
+    let graphBounds = null;
+
+    function frameGraph() {
+        const container = document.getElementById('graph-canvas');
+        if (!networkInstance || !graphBounds || !container) return;
+        const pad = 120; // room for the labels, which sit outside the node coordinates
+        const w = (graphBounds.maxX - graphBounds.minX) + pad * 2;
+        const h = (graphBounds.maxY - graphBounds.minY) + pad * 2;
+        const legendReserve = 110; // the legend pill floats over the bottom of the canvas
+        const viewW = container.clientWidth || 800;
+        const viewH = (container.clientHeight || 600) - legendReserve;
+        const scale = Math.max(0.05, Math.min(Math.min(viewW / w, viewH / h), 2));
+        networkInstance.moveTo({
+            position: {
+                x: (graphBounds.minX + graphBounds.maxX) / 2,
+                // Canvas y grows downward, so moving the camera down lifts the graph clear
+                // of the legend strip at the bottom.
+                y: (graphBounds.minY + graphBounds.maxY) / 2 + (legendReserve / 2) / scale
+            },
+            scale: scale
+        });
+    }
 
     // Rewriting all 189 nodes on every hover and again on every blur cost ~11ms a pair,
     // which is what made moving the mouse over the graph feel heavy. Only the nodes whose
@@ -727,30 +749,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (shouldDim) graphDimmed.add(id); else graphDimmed.delete(id);
         });
         if (updates.length) nodesDataset.update(updates);
-    }
-
-    function freezeGraphPhysics() {
-        if (!networkInstance) return;
-        clearTimeout(graphFreezeTimer);
-        graphFreezeTimer = null;
-        if (networkInstance.physics && networkInstance.physics.options.enabled === false) return;
-        networkInstance.setOptions({ physics: { enabled: false } });
-        networkInstance.redraw();
-    }
-
-    // Freeze on whichever settle signal arrives first:
-    // - "stabilizationIterationsDone" (~1.2s here) ends the initial layout pass, but only
-    //   ever fires once, so it cannot cover the restarts caused by revisiting the tab.
-    // - "stabilized" (~5.0s here) fires on every convergence and covers those restarts.
-    // Without a freeze the solver keeps simulating 189 nodes in the background and the
-    // whole browser slows down. The timer is only a backstop for layouts that never
-    // converge — keep it above the measured settle time or it freezes a half-formed graph.
-    function settleThenFreezeGraph() {
-        if (!networkInstance) return;
-        clearTimeout(graphFreezeTimer);
-        networkInstance.once("stabilizationIterationsDone", freezeGraphPhysics);
-        networkInstance.once("stabilized", freezeGraphPhysics);
-        graphFreezeTimer = setTimeout(freezeGraphPhysics, 10000);
     }
 
     function initKnowledgeGraph(items) {
@@ -803,6 +801,43 @@ document.addEventListener('DOMContentLoaded', () => {
             if (articlesByCategory[cat]) articlesByCategory[cat].push(article);
         });
 
+        // Positions are computed here instead of by the physics solver. Running the solver
+        // blocked the main thread for ~1.3s every time the graph opened, and needed a
+        // freeze afterwards or it simulated forever. The layout only depends on the article
+        // set, so it can be derived directly: categories sit on a ring, and each category's
+        // articles spiral outward from its centre by the golden angle, which spreads them
+        // evenly without any relaxation pass.
+        const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+        const catNames = Object.keys(categories);
+        const ringRadius = 620;
+        const catCenters = {};
+        catNames.forEach((cat, i) => {
+            const angle = (2 * Math.PI * i) / catNames.length - Math.PI / 2;
+            catCenters[cat] = { x: Math.cos(angle) * ringRadius, y: Math.sin(angle) * ringRadius };
+        });
+
+        const positions = {};
+        Object.entries(articlesByCategory).forEach(([catId, catArticles]) => {
+            const centre = catCenters[catId] || { x: 0, y: 0 };
+            const spread = 34; // gap between neighbouring articles in a cluster
+            [...catArticles].sort((a, b) => a.id - b.id).forEach((article, idx) => {
+                const r = spread * Math.sqrt(idx + 0.5);
+                const theta = idx * GOLDEN_ANGLE;
+                positions[article.id] = {
+                    x: centre.x + Math.cos(theta) * r,
+                    y: centre.y + Math.sin(theta) * r
+                };
+            });
+        });
+
+        const pts = Object.values(positions);
+        graphBounds = pts.length ? {
+            minX: Math.min(...pts.map(p => p.x)),
+            maxX: Math.max(...pts.map(p => p.x)),
+            minY: Math.min(...pts.map(p => p.y)),
+            maxY: Math.max(...pts.map(p => p.y))
+        } : null;
+
         // 1. Build Nodes (Clean minimalist dots like Obsidian)
         items.forEach(article => {
             const catId = article.category || "기획론";
@@ -813,10 +848,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 nodeLabel = nodeLabel.substring(0, 24) + "...";
             }
 
+            const pos = positions[article.id] || { x: 0, y: 0 };
             nodesArray.push({
                 id: article.id,
                 label: nodeLabel,
                 title: `${article.title}\n(${catId} | ${article.date})`,
+                x: Math.round(pos.x),
+                y: Math.round(pos.y),
                 color: {
                     background: nodeFill,
                     border: nodeStroke,
@@ -891,20 +929,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 dragView: true
             },
             physics: {
-                enabled: true,
-                barnesHut: {
-                    gravitationalConstant: -1200,
-                    centralGravity: 0.3,
-                    springLength: 70,
-                    springConstant: 0.04,
-                    damping: 0.8,
-                    avoidOverlap: 0.5
-                },
-                stabilization: {
-                    enabled: true,
-                    iterations: 150,
-                    fit: true
-                }
+                // Node coordinates are precomputed, so there is nothing to solve. This is
+                // what removes the ~1.3s of main-thread blocking on open and the
+                // background simulation that kept running afterwards.
+                enabled: false
             }
         };
 
@@ -912,9 +940,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // stabilization pass, so nodes scatter outward and freeze mid-flight as a ring.
         // Recreating runs the same path as the first build and settles properly in ~1s.
         if (networkInstance) {
-            clearTimeout(graphFreezeTimer);
             clearTimeout(graphBlurTimer);
-            graphFreezeTimer = null;
             networkInstance.destroy();
             networkInstance = null;
         }
@@ -925,20 +951,11 @@ document.addEventListener('DOMContentLoaded', () => {
             edgesDataset = new vis.DataSet(edgesArray);
             networkInstance = new vis.Network(container, { nodes: nodesDataset, edges: edgesDataset }, options);
 
-            // Freeze physics after initial stabilization like Obsidian
-            settleThenFreezeGraph();
-
-            // Organic Obsidian Drag: temporarily re-enable physics while dragging a node so connected neighbors pull along
-            networkInstance.on("dragStart", function (params) {
-                if (params.nodes.length > 0) {
-                    networkInstance.setOptions({ physics: { enabled: true } });
-                }
-            });
-
-            networkInstance.on("dragEnd", function (params) {
-                // Settle and freeze physics back to static after drag finishes
-                setTimeout(freezeGraphPhysics, 300);
-            });
+            // Frame the view from the coordinates we generated rather than vis.fit(),
+            // which repeatedly measured a stale canvas here and left the graph parked in a
+            // corner. Hooked to the first paint: setting the camera before that gets
+            // overwritten by vis's own initial view.
+            networkInstance.once("afterDrawing", () => frameGraph());
 
             // Obsidian-style hover focus: highlight connected nodes, fade rest
             networkInstance.on("hoverNode", function (params) {
