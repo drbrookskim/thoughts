@@ -709,25 +709,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // canvas and wipes whatever was drawn. With the simulation stopped nothing repaints
     // it, so the graph goes blank — redraw right after freezing.
     let graphFreezeTimer = null;
+    let graphSignature = null;
 
     function freezeGraphPhysics() {
         if (!networkInstance) return;
         clearTimeout(graphFreezeTimer);
         graphFreezeTimer = null;
+        if (networkInstance.physics && networkInstance.physics.options.enabled === false) return;
         networkInstance.setOptions({ physics: { enabled: false } });
         networkInstance.redraw();
     }
 
-    // "stabilizationIterationsDone" only fires for the very first stabilization run, so a
-    // restart (every graph tab visit re-enables physics) left the solver simulating 189
-    // nodes forever in the background — the whole browser got slower the longer the tab
-    // stayed open. "stabilized" fires each time the solver settles, and the timer caps
-    // layouts that never converge.
+    // Freeze on whichever settle signal arrives first:
+    // - "stabilizationIterationsDone" (~1.2s here) ends the initial layout pass, but only
+    //   ever fires once, so it cannot cover the restarts caused by revisiting the tab.
+    // - "stabilized" (~5.0s here) fires on every convergence and covers those restarts.
+    // Without a freeze the solver keeps simulating 189 nodes in the background and the
+    // whole browser slows down. The timer is only a backstop for layouts that never
+    // converge — keep it above the measured settle time or it freezes a half-formed graph.
     function settleThenFreezeGraph() {
         if (!networkInstance) return;
         clearTimeout(graphFreezeTimer);
+        networkInstance.once("stabilizationIterationsDone", freezeGraphPhysics);
         networkInstance.once("stabilized", freezeGraphPhysics);
-        graphFreezeTimer = setTimeout(freezeGraphPhysics, 4000);
+        graphFreezeTimer = setTimeout(freezeGraphPhysics, 10000);
     }
 
     function initKnowledgeGraph(items) {
@@ -739,6 +744,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Monochrome palette, flipped for the light canvas. The dark values wash out
         // completely on the light theme — white edges become invisible.
         const isDark = document.body.classList.contains('theme-dark');
+
+        // The graph is built purely from the article set and the theme. Rebuilding it on
+        // every tab visit threw the settled positions away and re-ran the solver for ~10s
+        // each time; reuse the existing layout whenever neither input changed.
+        const signature = items.length + '|' + isDark;
+        if (networkInstance && signature === graphSignature) {
+            networkInstance.redraw();
+            return;
+        }
+        graphSignature = signature;
+
         const nodeFill = isDark ? '#888888' : '#9ca3af';
         const nodeStroke = isDark ? '#aaaaaa' : '#6b7280';
         const nodeAccent = isDark ? '#ffffff' : '#111827';
@@ -874,7 +890,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        if (!networkInstance) {
+        // Rebuilding in place (clear + add + restart physics) skips the configured
+        // stabilization pass, so nodes scatter outward and freeze mid-flight as a ring.
+        // Recreating runs the same path as the first build and settles properly in ~1s.
+        if (networkInstance) {
+            clearTimeout(graphFreezeTimer);
+            graphFreezeTimer = null;
+            networkInstance.destroy();
+            networkInstance = null;
+        }
+
+        {
             nodesDataset = new vis.DataSet(nodesArray);
             edgesDataset = new vis.DataSet(edgesArray);
             networkInstance = new vis.Network(container, { nodes: nodesDataset, edges: edgesDataset }, options);
@@ -917,13 +943,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             });
-        } else {
-            nodesDataset.clear();
-            edgesDataset.clear();
-            nodesDataset.add(nodesArray);
-            edgesDataset.add(edgesArray);
-            networkInstance.setOptions({ physics: { enabled: true } });
-            settleThenFreezeGraph();
         }
     }
 
