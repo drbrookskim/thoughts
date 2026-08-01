@@ -708,6 +708,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let graphSignature = null;
     let graphBlurTimer = null;
     let graphDimmed = new Set(); // ids currently faded out by hover focus
+    let dragFollowers = null; // node being dragged plus the neighbours trailing it
 
     // Centre and zoom the graph from the precomputed node coordinates. vis.fit() kept
     // measuring the canvas before it had its visible size and framed the view off-centre;
@@ -956,6 +957,56 @@ document.addEventListener('DOMContentLoaded', () => {
             // corner. Hooked to the first paint: setting the camera before that gets
             // overwritten by vis's own initial view.
             networkInstance.once("afterDrawing", () => frameGraph());
+
+            // Obsidian drags the neighbourhood along with the node under the cursor. That
+            // came from its force solver; here the same feel is produced by moving only the
+            // linked nodes by a fraction of the drag, which costs a few moveNode calls per
+            // frame instead of re-simulating the whole graph.
+            networkInstance.on("dragStart", function (params) {
+                dragFollowers = null;
+                if (!params.nodes || !params.nodes.length) return;
+                const draggedId = params.nodes[0];
+                const pos = networkInstance.getPositions();
+                if (!pos[draggedId]) return;
+
+                const direct = graphAdjacency[draggedId] || new Set();
+                const indirect = new Set();
+                direct.forEach(nid => {
+                    (graphAdjacency[nid] || new Set()).forEach(n2 => {
+                        if (n2 !== draggedId && !direct.has(n2)) indirect.add(n2);
+                    });
+                });
+
+                const followers = [];
+                direct.forEach(nid => {
+                    if (pos[nid]) followers.push({ id: nid, start: { x: pos[nid].x, y: pos[nid].y }, pull: 0.38 });
+                });
+                indirect.forEach(nid => {
+                    // Hubs can reach a hundred nodes two hops out; cap it so a drag stays cheap.
+                    if (pos[nid] && followers.length < 60) {
+                        followers.push({ id: nid, start: { x: pos[nid].x, y: pos[nid].y }, pull: 0.13 });
+                    }
+                });
+
+                dragFollowers = { id: draggedId, start: { x: pos[draggedId].x, y: pos[draggedId].y }, followers };
+            });
+
+            // Not gated on params.nodes: vis does not always report the dragged node on
+            // this event, and dragStart already told us which one is being moved.
+            networkInstance.on("dragging", function () {
+                if (!dragFollowers) return;
+                const cur = networkInstance.getPositions([dragFollowers.id])[dragFollowers.id];
+                if (!cur) return;
+                const dx = cur.x - dragFollowers.start.x;
+                const dy = cur.y - dragFollowers.start.y;
+                dragFollowers.followers.forEach(f => {
+                    networkInstance.moveNode(f.id, f.start.x + dx * f.pull, f.start.y + dy * f.pull);
+                });
+            });
+
+            networkInstance.on("dragEnd", function () {
+                dragFollowers = null;
+            });
 
             // Obsidian-style hover focus: highlight connected nodes, fade rest
             networkInstance.on("hoverNode", function (params) {
