@@ -710,6 +710,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // it, so the graph goes blank — redraw right after freezing.
     let graphFreezeTimer = null;
     let graphSignature = null;
+    let graphBlurTimer = null;
+    let graphDimmed = new Set(); // ids currently faded out by hover focus
+
+    // Rewriting all 189 nodes on every hover and again on every blur cost ~11ms a pair,
+    // which is what made moving the mouse over the graph feel heavy. Only the nodes whose
+    // opacity actually changes get written. Pass null to clear the focus.
+    function applyGraphDimming(keepFn) {
+        if (!nodesDataset) return;
+        const updates = [];
+        nodesDataset.getIds().forEach(id => {
+            const shouldDim = keepFn ? !keepFn(id) : false;
+            const isDimmed = graphDimmed.has(id);
+            if (shouldDim === isDimmed) return;
+            updates.push({ id: id, opacity: shouldDim ? 0.15 : 1 });
+            if (shouldDim) graphDimmed.add(id); else graphDimmed.delete(id);
+        });
+        if (updates.length) nodesDataset.update(updates);
+    }
 
     function freezeGraphPhysics() {
         if (!networkInstance) return;
@@ -895,10 +913,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Recreating runs the same path as the first build and settles properly in ~1s.
         if (networkInstance) {
             clearTimeout(graphFreezeTimer);
+            clearTimeout(graphBlurTimer);
             graphFreezeTimer = null;
             networkInstance.destroy();
             networkInstance = null;
         }
+        graphDimmed.clear();
 
         {
             nodesDataset = new vis.DataSet(nodesArray);
@@ -922,15 +942,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Obsidian-style hover focus: highlight connected nodes, fade rest
             networkInstance.on("hoverNode", function (params) {
+                clearTimeout(graphBlurTimer);
                 const neighbors = graphAdjacency[params.node] || new Set();
-                nodesDataset.update(nodesDataset.getIds().map(id => ({
-                    id: id,
-                    opacity: (id === params.node || neighbors.has(id)) ? 1 : 0.15
-                })));
+                applyGraphDimming(id => id === params.node || neighbors.has(id));
             });
 
+            // Restoring on every blur made a mouse sweep across the graph rewrite all 189
+            // nodes twice per node passed. Waiting a beat lets the next hover diff against
+            // the current state instead.
             networkInstance.on("blurNode", function () {
-                nodesDataset.update(nodesDataset.getIds().map(id => ({ id: id, opacity: 1 })));
+                clearTimeout(graphBlurTimer);
+                graphBlurTimer = setTimeout(() => applyGraphDimming(null), 120);
             });
 
             // Click node -> select article without reload overhead
