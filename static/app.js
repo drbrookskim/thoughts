@@ -1034,9 +1034,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!cur) return;
                 const dx = cur.x - dragFollowers.start.x;
                 const dy = cur.y - dragFollowers.start.y;
+                // Written straight onto the bodies and drawn once, the same way the
+                // entrance and the settle do it. moveNode() redraws on every call, so a
+                // pointer move was repainting the whole graph up to 61 times.
+                const bodies = networkInstance.body.nodes;
                 dragFollowers.followers.forEach(f => {
-                    networkInstance.moveNode(f.id, f.start.x + dx * f.pull, f.start.y + dy * f.pull);
+                    const body = bodies[f.id];
+                    if (!body) return;
+                    body.x = f.start.x + dx * f.pull;
+                    body.y = f.start.y + dy * f.pull;
                 });
+                networkInstance.redraw();
             });
 
             // Obsidian's neighbours spring back once you let go — the node you moved stays
