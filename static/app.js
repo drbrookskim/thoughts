@@ -711,19 +711,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragFollowers = null; // node being dragged plus the neighbours trailing it
     let graphEntranceRaf = null;
 
-    // Obsidian animates its graph into place on open. There is no solver here to produce
-    // that, so the same effect comes from interpolating between the collapsed start
-    // positions and the final ones. Node coordinates are written straight onto the vis
-    // bodies and drawn once per frame — moveNode() would trigger its own redraw per node,
-    // which at 189 nodes a frame is what we removed the physics to avoid.
-    function animateGraphEntrance(startPositions, endPositions) {
+    // Drives both the opening bloom and the settle after a drag. Node coordinates are
+    // written straight onto the vis bodies and drawn once per frame — moveNode() would
+    // trigger its own redraw per node, which at 189 nodes a frame is what we removed the
+    // physics to avoid.
+    function animateNodesTo(startPositions, endPositions, duration) {
         if (!networkInstance) return;
         if (graphEntranceRaf) cancelAnimationFrame(graphEntranceRaf);
         const bodies = networkInstance.body.nodes;
         const ids = Object.keys(endPositions).filter(id => bodies[id] && startPositions[id]);
         if (!ids.length) return;
 
-        const DURATION = 700;
+        const DURATION = duration || 700;
         const t0 = performance.now();
         const step = (now) => {
             if (!networkInstance) return;
@@ -986,7 +985,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // overwritten by vis's own initial view.
             networkInstance.once("afterDrawing", () => {
                 frameGraph();
-                animateGraphEntrance(entranceStart, positions);
+                animateNodesTo(entranceStart, positions);
             });
 
             // Obsidian drags the neighbourhood along with the node under the cursor. That
@@ -995,6 +994,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // frame instead of re-simulating the whole graph.
             networkInstance.on("dragStart", function (params) {
                 dragFollowers = null;
+                // A settle from the previous release may still be running; grabbing a node
+                // now must win, or the two write the same coordinates against each other.
+                if (graphEntranceRaf) {
+                    cancelAnimationFrame(graphEntranceRaf);
+                    graphEntranceRaf = null;
+                }
                 if (!params.nodes || !params.nodes.length) return;
                 const draggedId = params.nodes[0];
                 const pos = networkInstance.getPositions();
@@ -1035,8 +1040,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
 
+            // Obsidian's neighbours spring back once you let go — the node you moved stays
+            // put, the ones that trailed it relax to where they were. The follower list and
+            // its original coordinates are already sitting in dragFollowers from dragStart,
+            // so this is the same handful of writes per frame the drag itself cost.
             networkInstance.on("dragEnd", function () {
+                if (!dragFollowers) return;
+                const settling = dragFollowers.followers;
                 dragFollowers = null;
+                if (!settling.length) return;
+
+                const from = networkInstance.getPositions(settling.map(f => f.id));
+                const to = {};
+                settling.forEach(f => { to[f.id] = f.start; });
+                animateNodesTo(from, to, 320);
             });
 
             // Obsidian-style hover focus: highlight connected nodes, fade rest
