@@ -199,6 +199,49 @@ def layout(node_count, edges, iterations=600, seed=7):
     return pos
 
 
+def solve_positions(node_count, edges):
+    """Run the layout and fit it to the canvas extent the runtime frames from."""
+    positions = layout(node_count, edges)
+    positions -= positions.mean(axis=0)
+    # Fitting a round layout into a widescreen pane leaves the zoom limited by height
+    # and half the width empty, so the extent is stretched to the pane's aspect ratio.
+    extent = np.abs(positions).max(axis=0)
+    extent[extent == 0] = 1.0
+    return positions * (np.array([1150.0, 700.0]) / extent)
+
+
+def previous_positions(nodes, edges, out_path):
+    """The coordinates already committed, when the graph they describe is the same one.
+
+    numpy's reductions accumulate in an order that depends on the BLAS and the SIMD
+    width, so the solver lands a fraction of a unit apart on the CI runner than it
+    does here. graph.json is a single line, which turned that into a whole-file diff
+    and an hourly commit even on hours when nothing was published.
+
+    Not solving at all when the structure is unchanged removes the difference rather
+    than trying to round it away — no rounding survives two inputs that straddle a
+    boundary. It also keeps the map still for readers, which is what they want: the
+    graph should move when the writing moves, not every hour."""
+    try:
+        with open(out_path, encoding='utf-8') as f:
+            previous = json.load(f)
+    except (OSError, ValueError):
+        return None
+
+    ids = [node['id'] for node in nodes]
+    if [node['id'] for node in previous['nodes']] != ids:
+        return None
+
+    want = {(nodes[a]['id'], nodes[b]['id']) for a, b, _ in edges}
+    have = {(edge['from'], edge['to']) for edge in previous['edges']}
+    if want != have:
+        return None
+
+    if any('x' not in node or 'y' not in node for node in previous['nodes']):
+        return None
+    return np.array([[node['x'], node['y']] for node in previous['nodes']], dtype=float)
+
+
 def build(articles_path=os.path.join(API_DIR, 'articles.json'),
           articles_dir=ARTICLES_DIR,
           out_path=os.path.join(API_DIR, 'graph.json')):
@@ -240,14 +283,9 @@ def build(articles_path=os.path.join(API_DIR, 'articles.json'),
         for row in rows:
             edges.append((row, concept_index, CONCEPT_EDGE_PULL))
 
-    positions = layout(len(nodes), edges)
-    positions -= positions.mean(axis=0)
-    # vis.js reads these as canvas units; the runtime frames from the extent. Fitting a
-    # round layout into a widescreen pane leaves the zoom limited by height and half the
-    # width empty, so the extent is stretched to roughly the pane's aspect ratio.
-    extent = np.abs(positions).max(axis=0)
-    extent[extent == 0] = 1.0
-    positions *= np.array([1150.0, 700.0]) / extent
+    positions = previous_positions(nodes, edges, out_path)
+    if positions is None:
+        positions = solve_positions(len(nodes), edges)
 
     degree = [0] * len(nodes)
     for a, b, _ in edges:
@@ -301,6 +339,21 @@ def demo():
     linked = np.linalg.norm(pos[0] - pos[1])
     unlinked = np.linalg.norm(pos[0] - pos[2])
     assert linked < unlinked, 'linked nodes must settle closer than unlinked ones'
+
+    # Coordinates are reused only while the graph they belong to is the same one.
+    import tempfile
+    nodes = [{'id': 'a1', 'x': 5.0, 'y': 6.0}, {'id': 'c:x', 'x': -5.0, 'y': -6.0}]
+    with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as f:
+        json.dump({'nodes': nodes, 'edges': [{'from': 'a1', 'to': 'c:x'}]}, f)
+        path = f.name
+    same = previous_positions(nodes, [(0, 1, 1.0)], path)
+    assert same is not None and same.tolist() == [[5.0, 6.0], [-5.0, -6.0]], same
+    # A changed edge set has to force a fresh solve, not silently keep stale coordinates.
+    assert previous_positions(nodes, [], path) is None
+    assert previous_positions(nodes + [{'id': 'a2'}], [(0, 1, 1.0)], path) is None
+    assert previous_positions(nodes, [(0, 1, 1.0)], path + '.missing') is None
+    os.unlink(path)
+
     print('build_graph self-check ok')
 
 
