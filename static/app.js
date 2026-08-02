@@ -751,16 +751,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const pad = 120; // room for the labels, which sit outside the node coordinates
         const w = (graphBounds.maxX - graphBounds.minX) + pad * 2;
         const h = (graphBounds.maxY - graphBounds.minY) + pad * 2;
-        const legendReserve = 110; // the legend pill floats over the bottom of the canvas
+        // The legend used to be a full-width strip along the bottom, so a band of height
+        // was reserved for it and the graph pushed up out of the way. It sits in the
+        // top-right corner now and covers no strip, so the whole canvas is usable again.
         const viewW = container.clientWidth || 800;
-        const viewH = (container.clientHeight || 600) - legendReserve;
+        const viewH = container.clientHeight || 600;
         const scale = Math.max(0.05, Math.min(Math.min(viewW / w, viewH / h), 2));
         networkInstance.moveTo({
             position: {
                 x: (graphBounds.minX + graphBounds.maxX) / 2,
-                // Canvas y grows downward, so moving the camera down lifts the graph clear
-                // of the legend strip at the bottom.
-                y: (graphBounds.minY + graphBounds.maxY) / 2 + (legendReserve / 2) / scale
+                y: (graphBounds.minY + graphBounds.maxY) / 2
             },
             scale: scale
         });
@@ -949,6 +949,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 smooth: false
             },
             interaction: {
+                // Drawing 699 edges and their arrowheads is what a repaint actually costs;
+                // the nodes are cheap. vis skips both while a drag is in progress, which
+                // is the one moment the graph repaints on every frame.
+                hideEdgesOnDrag: true,
                 hover: true,
                 tooltipDelay: 150,
                 zoomView: true,

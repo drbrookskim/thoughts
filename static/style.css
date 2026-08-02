@@ -772,9 +772,11 @@ html, body {
 
 .graph-legend {
     position: absolute;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 16px;
+    right: 16px;
+    /* Four of the widest items plus their gaps and the pill padding — enough to keep
+       the seven categories on two rows instead of trickling down the right edge. */
+    max-width: min(460px, calc(100% - 32px));
     background: var(--bg-base);
     border: 1px solid var(--border-hairline);
     border-radius: var(--radius-pill);
@@ -783,7 +785,7 @@ html, body {
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: flex-end;
     z-index: 5;
 }
 
