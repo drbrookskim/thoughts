@@ -709,6 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let graphDimmed = new Set(); // ids currently faded out by hover focus
     let dragFollowers = null; // node being dragged plus the neighbours trailing it
     let graphEntranceRaf = null;
+    let dragRedrawRaf = null; // pending repaint for the current drag, at most one a frame
 
     // Drives both the opening bloom and the settle after a drag. Node coordinates are
     // written straight onto the vis bodies and drawn once per frame — moveNode() would
@@ -968,6 +969,9 @@ document.addEventListener('DOMContentLoaded', () => {
             clearTimeout(graphBlurTimer);
             if (graphEntranceRaf) cancelAnimationFrame(graphEntranceRaf);
             graphEntranceRaf = null;
+            if (dragRedrawRaf !== null) cancelAnimationFrame(dragRedrawRaf);
+            dragRedrawRaf = null;
+            dragFollowers = null;
             networkInstance.destroy();
             networkInstance = null;
         }
@@ -998,6 +1002,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (graphEntranceRaf) {
                     cancelAnimationFrame(graphEntranceRaf);
                     graphEntranceRaf = null;
+                }
+                if (dragRedrawRaf !== null) {
+                    cancelAnimationFrame(dragRedrawRaf);
+                    dragRedrawRaf = null;
                 }
                 if (!params.nodes || !params.nodes.length) return;
                 const draggedId = params.nodes[0];
@@ -1034,9 +1042,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!cur) return;
                 const dx = cur.x - dragFollowers.start.x;
                 const dy = cur.y - dragFollowers.start.y;
-                // Written straight onto the bodies and drawn once, the same way the
-                // entrance and the settle do it. moveNode() redraws on every call, so a
-                // pointer move was repainting the whole graph up to 61 times.
+                // Written straight onto the bodies, the same way the entrance and the
+                // settle do it. moveNode() redraws on every call, so a pointer move was
+                // repainting the whole graph up to 61 times.
                 const bodies = networkInstance.body.nodes;
                 dragFollowers.followers.forEach(f => {
                     const body = bodies[f.id];
@@ -1044,7 +1052,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     body.x = f.start.x + dx * f.pull;
                     body.y = f.start.y + dy * f.pull;
                 });
-                networkInstance.redraw();
+                // A mouse reporting faster than the display fires several of these between
+                // frames, and each one repainted 357 nodes and 699 edges that nobody saw.
+                // Coalescing to one repaint a frame keeps the last positions and drops the
+                // rest — the writes above are cheap, the repaint is not.
+                if (dragRedrawRaf === null) {
+                    dragRedrawRaf = requestAnimationFrame(() => {
+                        dragRedrawRaf = null;
+                        if (networkInstance) networkInstance.redraw();
+                    });
+                }
             });
 
             // Obsidian's neighbours spring back once you let go — the node you moved stays
@@ -1052,6 +1069,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // its original coordinates are already sitting in dragFollowers from dragStart,
             // so this is the same handful of writes per frame the drag itself cost.
             networkInstance.on("dragEnd", function () {
+                // The settle drives its own frames from here; a repaint still queued from
+                // the last pointer move would draw a stale frame on top of its first one.
+                if (dragRedrawRaf !== null) {
+                    cancelAnimationFrame(dragRedrawRaf);
+                    dragRedrawRaf = null;
+                }
                 if (!dragFollowers) return;
                 const settling = dragFollowers.followers;
                 dragFollowers = null;
