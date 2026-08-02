@@ -306,6 +306,13 @@ def check_new_articles():
     })
 
 
+@app.route('/api/graph.json', methods=['GET'])
+def get_graph():
+    """The knowledge graph, precomputed by build_graph.py. Served as a file so the
+    dev server and the static build hand the browser the same bytes."""
+    return send_from_directory('api', 'graph.json')
+
+
 @app.route('/api/articles.json', methods=['GET'])
 @app.route('/api/articles', methods=['GET'])
 def get_articles():

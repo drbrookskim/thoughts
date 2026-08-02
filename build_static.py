@@ -175,4 +175,7 @@ for cat, items in category_groups.items():
         f.write("\n".join(md_lines) + "\n")
     print(f"Generated category index: {outfile} ({len(items)} articles)")
 
+import build_graph
+build_graph.build()
+
 print("Static API and Category Index files generated successfully.")

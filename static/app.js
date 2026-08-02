@@ -474,19 +474,19 @@ document.addEventListener('DOMContentLoaded', () => {
         articleView.classList.add('hidden');
         if (writeView) writeView.classList.add('hidden');
 
-        // Always re-initialize the graph to reflect any new article selection focus
-        initKnowledgeGraph(articles);
-
-        // The canvas is only sized correctly once the container is visible, so it still
-        // needs a redraw here. Framing is not repeated: frameGraphToBounds already set the
-        // camera, and vis.fit() at this point would measure a stale canvas and undo it.
-        if (networkInstance) {
+        // Always re-initialize the graph to reflect any new article selection focus.
+        // The graph data is fetched, so the redraw has to wait on it rather than on a
+        // timer — on a cold open there is no network instance to redraw yet.
+        initKnowledgeGraph(articles).then(() => {
+            // The canvas is only sized correctly once the container is visible, so it
+            // still needs a redraw here. Framing is not repeated on the first build:
+            // afterDrawing already set the camera.
             setTimeout(() => {
                 if (!networkInstance) return;
                 networkInstance.redraw();
                 frameGraph();
             }, 100);
-        }
+        });
     });
 
     tabReaderBtn.addEventListener('click', () => {
@@ -783,9 +783,40 @@ document.addEventListener('DOMContentLoaded', () => {
         if (updates.length) nodesDataset.update(updates);
     }
 
-    function initKnowledgeGraph(items) {
-        if (!items || items.length === 0) return;
+    // The graph is derived from the article text at build time — see build_graph.py.
+    // Fetched once and reused; it only changes when the site is rebuilt.
+    let graphData = null;
+    let graphDataPromise = null;
 
+    function loadGraphData() {
+        if (graphData) return Promise.resolve(graphData);
+        if (graphDataPromise) return graphDataPromise;
+        const candidates = [
+            'api/graph.json',
+            './api/graph.json',
+            '/thoughts/api/graph.json',
+            `${window.location.pathname.replace(/\/$/, '')}/api/graph.json`
+        ];
+        graphDataPromise = (async () => {
+            for (const url of candidates) {
+                try {
+                    const res = await fetch(url);
+                    if (!res.ok) continue;
+                    graphData = await res.json();
+                    return graphData;
+                } catch (e) { /* try the next path */ }
+            }
+            console.error('Error: Could not load graph.json from any known path.');
+            return null;
+        })();
+        return graphDataPromise;
+    }
+
+    function initKnowledgeGraph(items) {
+        return loadGraphData().then(data => { if (data) buildKnowledgeGraph(data, items); });
+    }
+
+    function buildKnowledgeGraph(data, items) {
         const container = document.getElementById('graph-canvas');
         if (!container) return;
 
@@ -793,22 +824,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // completely on the light theme — white edges become invisible.
         const isDark = document.body.classList.contains('theme-dark');
 
-        // The graph is built purely from the article set and the theme. Rebuilding it on
+        // The graph is built purely from the graph data and the theme. Rebuilding it on
         // every tab visit threw the settled positions away and re-ran the solver for ~10s
         // each time; reuse the existing layout whenever neither input changed.
-        const signature = items.length + '|' + isDark;
+        const signature = data.nodes.length + '|' + data.edges.length + '|' + isDark;
         if (networkInstance && signature === graphSignature) {
             networkInstance.redraw();
             return;
         }
         graphSignature = signature;
 
-        const nodeFill = isDark ? '#888888' : '#9ca3af';
-        const nodeStroke = isDark ? '#aaaaaa' : '#6b7280';
-        const nodeAccent = isDark ? '#ffffff' : '#111827';
         const labelColor = isDark ? '#cccccc' : '#4b5563';
-        const edgeSpine = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(17, 24, 39, 0.22)';
-        const edgeBranch = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(17, 24, 39, 0.14)';
+        const conceptFill = isDark ? '#5a5f6a' : '#c9ced8';
+        const edgeIdle = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(17, 24, 39, 0.12)';
+        // The focused subgraph has to read as a different layer, not a lighter shade of
+        // the same one — that contrast is the whole point of the hover state.
+        const edgeFocus = isDark ? '#4facfe' : '#2f7fd4';
 
         // Categories & Palette
         const categories = {
@@ -821,48 +852,15 @@ document.addEventListener('DOMContentLoaded', () => {
             "경제와 가치": { color: "#2ecc71" }
         };
 
-        const nodesArray = [];
-        const edgesArray = [];
-        graphAdjacency = {};
-
-        // Group articles by category
-        const articlesByCategory = {};
-        Object.keys(categories).forEach(cat => { articlesByCategory[cat] = []; });
-        items.forEach(article => {
-            const cat = article.category || "기획론";
-            if (articlesByCategory[cat]) articlesByCategory[cat].push(article);
-        });
-
-        // Positions are computed here instead of by the physics solver. Running the solver
-        // blocked the main thread for ~1.3s every time the graph opened, and needed a
-        // freeze afterwards or it simulated forever. The layout only depends on the article
-        // set, so it can be derived directly: categories sit on a ring, and each category's
-        // articles spiral outward from its centre by the golden angle, which spreads them
-        // evenly without any relaxation pass.
-        const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-        const catNames = Object.keys(categories);
-        const ringRadius = 620;
-        const catCenters = {};
-        catNames.forEach((cat, i) => {
-            const angle = (2 * Math.PI * i) / catNames.length - Math.PI / 2;
-            catCenters[cat] = { x: Math.cos(angle) * ringRadius, y: Math.sin(angle) * ringRadius };
-        });
+        const metaById = {};
+        (items || []).forEach(article => { metaById[article.id] = article; });
 
         const positions = {};
         const entranceStart = {};
-        Object.entries(articlesByCategory).forEach(([catId, catArticles]) => {
-            const centre = catCenters[catId] || { x: 0, y: 0 };
-            const spread = 34; // gap between neighbouring articles in a cluster
-            [...catArticles].sort((a, b) => a.id - b.id).forEach((article, idx) => {
-                const r = spread * Math.sqrt(idx + 0.5);
-                const theta = idx * GOLDEN_ANGLE;
-                positions[article.id] = {
-                    x: centre.x + Math.cos(theta) * r,
-                    y: centre.y + Math.sin(theta) * r
-                };
-                // Each cluster starts collapsed on its own centre and blooms outward.
-                entranceStart[article.id] = { x: centre.x, y: centre.y };
-            });
+        data.nodes.forEach(node => {
+            positions[node.id] = { x: node.x, y: node.y };
+            // Everything starts pulled in toward the centre and blooms outward.
+            entranceStart[node.id] = { x: node.x * 0.25, y: node.y * 0.25 };
         });
 
         const pts = Object.values(positions);
@@ -873,89 +871,83 @@ document.addEventListener('DOMContentLoaded', () => {
             maxY: Math.max(...pts.map(p => p.y))
         } : null;
 
-        // 1. Build Nodes (Clean minimalist dots like Obsidian)
-        items.forEach(article => {
-            const catId = article.category || "기획론";
-            const catMeta = categories[catId] || categories["기획론"];
+        // 1. Build Nodes. Articles carry their category colour; concepts are the
+        // neutral connective tissue between them and stay muted.
+        const nodesArray = data.nodes.map(node => {
+            const isArticle = node.type === 'article';
+            const catMeta = categories[node.category] || categories["기획론"];
+            const fill = isArticle ? catMeta.color : conceptFill;
+            const meta = isArticle ? metaById[node.articleId] : null;
 
-            let nodeLabel = article.title;
-            if (nodeLabel.length > 25) {
-                nodeLabel = nodeLabel.substring(0, 24) + "...";
-            }
+            let nodeLabel = node.label;
+            if (nodeLabel.length > 25) nodeLabel = nodeLabel.substring(0, 24) + "...";
 
-            const pos = positions[article.id] || { x: 0, y: 0 };
-            nodesArray.push({
-                id: article.id,
+            return {
+                id: node.id,
                 label: nodeLabel,
-                title: `${article.title}\n(${catId} | ${article.date})`,
-                x: Math.round(pos.x),
-                y: Math.round(pos.y),
+                title: meta ? `${node.label}\n(${node.category} | ${meta.date})` : node.label,
+                x: Math.round(node.x),
+                y: Math.round(node.y),
+                value: node.degree + 1,
                 color: {
-                    background: nodeFill,
-                    border: nodeStroke,
-                    highlight: { background: nodeAccent, border: nodeAccent },
-                    hover: { background: nodeAccent, border: nodeAccent }
+                    background: fill,
+                    border: fill,
+                    highlight: { background: fill, border: edgeFocus },
+                    hover: { background: fill, border: edgeFocus }
                 },
-                size: 5,
-                font: { size: 10, color: labelColor, face: 'Inter, sans-serif' }
-            });
+                font: {
+                    size: isArticle ? 11 : 9,
+                    color: labelColor,
+                    face: 'Inter, sans-serif'
+                }
+            };
         });
 
-        // 2. Build Intra-Category Edge Spine & Keyword Links
-        Object.entries(articlesByCategory).forEach(([catId, catArticles]) => {
-            catArticles.sort((a, b) => a.id - b.id);
-            catArticles.forEach((article, idx) => {
-                // Link sequential articles in category
-                if (idx > 0) {
-                    const prev = catArticles[idx - 1];
-                    edgesArray.push({
-                        from: article.id,
-                        to: prev.id,
-                        color: { color: edgeSpine, highlight: nodeAccent }
-                    });
-                    (graphAdjacency[article.id] = graphAdjacency[article.id] || new Set()).add(prev.id);
-                    (graphAdjacency[prev.id] = graphAdjacency[prev.id] || new Set()).add(article.id);
-                }
-                // Branching link every 4th item
-                if (idx > 3 && idx % 4 === 0) {
-                    const sibling = catArticles[idx - 4];
-                    edgesArray.push({
-                        from: article.id,
-                        to: sibling.id,
-                        color: { color: edgeBranch, highlight: nodeAccent }
-                    });
-                    (graphAdjacency[article.id] = graphAdjacency[article.id] || new Set()).add(sibling.id);
-                    (graphAdjacency[sibling.id] = graphAdjacency[sibling.id] || new Set()).add(article.id);
-                }
-            });
-        });
-
-        // Degree-based sizing (Obsidian hub sizing)
-        nodesArray.forEach(node => {
-            const degree = (graphAdjacency[node.id] ? graphAdjacency[node.id].size : 0);
-            node.value = degree + 1;
+        // 2. Edges come straight from the build. Arrows only on article→concept links,
+        // which are directed; the article↔article ones are similarity and are not.
+        graphAdjacency = {};
+        const edgesArray = data.edges.map((edge, idx) => {
+            (graphAdjacency[edge.from] = graphAdjacency[edge.from] || new Set()).add(edge.to);
+            (graphAdjacency[edge.to] = graphAdjacency[edge.to] || new Set()).add(edge.from);
+            return {
+                id: 'e' + idx,
+                from: edge.from,
+                to: edge.to,
+                arrows: edge.to.charAt(0) === 'c'
+                    ? { to: { enabled: true, scaleFactor: 0.35 } }
+                    : undefined,
+                color: { color: edgeIdle }
+            };
         });
 
         // Pure Obsidian Vis.js Network Options
         const options = {
             layout: {
-                // The 7 category clusters are disconnected from each other, which this
-                // algorithm cannot position — vis.js logs a warning and stalls before the
-                // first draw. Disabling it lets stabilization run and paint.
+                // Positions arrive precomputed, so vis has nothing to lay out — and this
+                // algorithm cannot handle the graph's disconnected components anyway: it
+                // logs a warning and stalls before the first draw.
                 improvedLayout: false
             },
             nodes: {
                 shape: 'dot',
                 borderWidth: 1.5,
                 scaling: {
-                    min: 4,
-                    max: 18,
-                    label: { enabled: true, min: 9, max: 18, drawThreshold: 8 }
+                    min: 3,
+                    max: 20,
+                    label: { enabled: true, min: 9, max: 17, drawThreshold: 6 }
                 }
             },
             edges: {
                 width: 1,
-                smooth: { type: 'continuous' }
+                // vis already redraws the hovered node's edges in these colours, which is
+                // the whole focus effect — the per-edge dataset writes it used to take
+                // were overwritten by this at draw time anyway.
+                color: { hover: edgeFocus, highlight: edgeFocus },
+                hoverWidth: 1,
+                selectionWidth: 1,
+                // Straight lines: 1257 curved edges cost more to draw than they add, and
+                // Obsidian draws its own straight.
+                smooth: false
             },
             interaction: {
                 hover: true,
@@ -1065,10 +1057,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // Click node -> select article without reload overhead
             networkInstance.on("click", function (params) {
                 if (params.nodes.length > 0) {
-                    const nodeId = params.nodes[0];
-                    if (typeof nodeId === 'number') {
-                        focusedArticleId = nodeId;
-                        selectArticle(nodeId, false, true);
+                    // Node ids are namespaced now: a<articleId> for articles, c:<term> for
+                    // concepts. Only the former opens anything.
+                    const nodeId = String(params.nodes[0]);
+                    if (nodeId.charAt(0) === 'a') {
+                        const articleId = parseInt(nodeId.slice(1), 10);
+                        if (!isNaN(articleId)) {
+                            focusedArticleId = articleId;
+                            selectArticle(articleId, false, true);
+                        }
                     }
                 }
             });
