@@ -478,14 +478,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // The graph data is fetched, so the redraw has to wait on it rather than on a
         // timer — on a cold open there is no network instance to redraw yet.
         initKnowledgeGraph(articles).then(() => {
-            // The canvas is only sized correctly once the container is visible, so it
-            // still needs a redraw here. Framing is not repeated on the first build:
-            // afterDrawing already set the camera.
-            setTimeout(() => {
-                if (!networkInstance) return;
-                networkInstance.redraw();
-                frameGraph();
-            }, 100);
+            if (!networkInstance) return;
+            // The container was unhidden above, and frameGraph reads clientWidth, which
+            // forces the layout to resolve before it measures. This used to sit behind a
+            // 100ms timer, which is where the pause on re-entry came from — the graph was
+            // built and then held back a tenth of a second for no reason.
+            networkInstance.redraw();
+            frameGraph();
         });
     });
 
