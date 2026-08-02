@@ -6,3 +6,5 @@ __pycache__/
 exchange-now/
 on-demand-news-finder/
 pitl-planning-in-the-loop/
+scratch/
+.claude/

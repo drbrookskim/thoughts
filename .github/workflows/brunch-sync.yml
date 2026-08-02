@@ -41,7 +41,10 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          git add .
+          # Only what the scraper and the build actually write. `git add .` swept up
+          # anything else that happened to be in the runner's tree — a nested copy of
+          # the whole repository got committed that way once.
+          git add brunch_articles api *.md
           if ! git diff --cached --quiet; then
             git commit -m "chore: 브런치 새 글 자동 동기화"
             # 💡 푸시하기 직전에 한 번 더 최신 상태를 합쳐서(rebase) 충돌을 방지합니다.
