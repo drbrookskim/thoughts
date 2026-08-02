@@ -118,7 +118,7 @@ def similarity_edges(matrix):
 
     edges = {}
     for i in range(sim.shape[0]):
-        for j in np.argsort(sim[i])[::-1][:SIM_EDGES_PER_ARTICLE]:
+        for j in np.argsort(sim[i], kind='stable')[::-1][:SIM_EDGES_PER_ARTICLE]:
             weight = float(sim[i, j])
             if weight < SIM_THRESHOLD:
                 break
@@ -130,12 +130,18 @@ def similarity_edges(matrix):
 def concept_links(matrix, vocab):
     """Terms that carry more than one article become their own node. This is
     what gives the graph its hubs — without them every article only ever
-    touches its four nearest neighbours and the result is a uniform mesh."""
+    touches its four nearest neighbours and the result is a uniform mesh.
+
+    Sorted stably: terms sharing a document frequency and a term frequency get
+    identical scores, and numpy's default quicksort broke those ties differently
+    on the CI runner than here. That reshuffled which terms became concepts, and
+    a handful of different nodes is enough to relax the layout somewhere else
+    entirely — the graph rearranged itself on every sync."""
     shareable = np.where((matrix > 0).sum(0) >= CONCEPT_MIN_DF, matrix, 0)
 
     holders = {}
     for row in range(shareable.shape[0]):
-        for col in np.argsort(shareable[row])[::-1][:CONCEPT_TERMS_PER_ARTICLE]:
+        for col in np.argsort(shareable[row], kind='stable')[::-1][:CONCEPT_TERMS_PER_ARTICLE]:
             if shareable[row, col] <= 0:
                 break
             holders.setdefault(vocab[col], []).append(row)
@@ -281,6 +287,14 @@ def demo():
     assert vocab, 'vocabulary collapsed'
     sim = matrix @ matrix.T
     assert sim[0, 1] > sim[0, 2], 'shared-vocabulary docs must score closer'
+
+    # Every term here scores identically, so the pick is decided purely by the
+    # tie-break. It has to be the same one twice, and on any other machine too.
+    tied = [tokenize('가치 설계 구조 시장'), tokenize('가치 설계 구조 시장')]
+    tied_matrix, tied_vocab = tfidf(tied + [tokenize('가치 설계 구조 시장')])
+    picked = [term for term, _ in concept_links(tied_matrix, tied_vocab)]
+    assert picked == [term for term, _ in concept_links(tied_matrix, tied_vocab)]
+    assert picked == sorted(picked, key=lambda t: -tied_vocab.index(t)), picked
 
     pos = layout(4, [(0, 1, 1.0), (2, 3, 1.0)], iterations=60)
     assert np.isfinite(pos).all(), 'layout diverged'
