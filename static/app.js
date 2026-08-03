@@ -865,16 +865,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // the same one — that contrast is the whole point of the hover state.
         const edgeFocus = isDark ? '#4facfe' : '#2f7fd4';
 
-        // Categories & Palette
-        const categories = {
-            "기획론": { color: "#a18cd1" },
-            "상품기획": { color: "#fbd043" },
-            "AI와 기술": { color: "#00f2fe" },
-            "인간과 심리": { color: "#ff6b8b" },
-            "사고와 언어": { color: "#ff9f43" },
-            "관계와 사회": { color: "#4facfe" },
-            "경제와 가치": { color: "#2ecc71" }
-        };
+        // Read straight off the legend swatches. This used to be a second palette here
+        // in the script, and all seven colours had drifted from the ones the legend
+        // shows — picking 기획론 lit up purple nodes next to a blue dot. Taking them
+        // from the dots leaves one place to change a colour.
+        const categories = {};
+        document.querySelectorAll('.legend-item').forEach(item => {
+            const dot = item.querySelector('.dot');
+            const category = item.getAttribute('data-category');
+            if (dot && category) {
+                categories[category] = { color: getComputedStyle(dot).backgroundColor };
+            }
+        });
 
         const metaById = {};
         (items || []).forEach(article => { metaById[article.id] = article; });
@@ -899,8 +901,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // neutral connective tissue between them and stay muted.
         const nodesArray = data.nodes.map(node => {
             const isArticle = node.type === 'article';
-            const catMeta = categories[node.category] || categories["기획론"];
-            const fill = isArticle ? catMeta.color : conceptFill;
+            const catMeta = categories[node.category];
+            // No legend in the DOM means no palette to read; the graph still draws.
+            const fill = isArticle && catMeta ? catMeta.color : conceptFill;
             const meta = isArticle ? metaById[node.articleId] : null;
 
             let nodeLabel = node.label;
