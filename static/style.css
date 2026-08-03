@@ -787,6 +787,11 @@ html, body {
     flex-wrap: wrap;
     justify-content: flex-end;
     z-index: 5;
+    cursor: move;
+    /* The pill is dragged with pointer events; without this a touch drag scrolls the
+       page instead, and a mouse drag selects the category labels as text. */
+    touch-action: none;
+    user-select: none;
 }
 
 .legend-item {

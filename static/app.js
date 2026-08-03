@@ -1240,10 +1240,67 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================================================
     // 🧠 LEGEND INTERACTIVE FILTER CONTROL
     // ==========================================================================
+    // The pill can be dragged out of the way — it sits over the top-right of the graph,
+    // which is exactly where a node someone wants to read can end up. Position is not
+    // kept across reloads; it goes back to the corner on the next visit.
+    const legendEl = document.querySelector('.graph-legend');
+    let legendDragged = false; // set when a drag ends, so it can swallow the click after it
+    if (legendEl) {
+        const graphArea = document.getElementById('graph-view-container');
+        let grab = null;
+
+        legendEl.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0 || !graphArea) return;
+            const box = legendEl.getBoundingClientRect();
+            const area = graphArea.getBoundingClientRect();
+            grab = {
+                x: e.clientX, y: e.clientY,
+                left: box.left - area.left, top: box.top - area.top,
+                width: box.width, height: box.height,
+                moved: false
+            };
+        });
+
+        // On document, not on the pill with setPointerCapture: capture retargets every
+        // later event to the element holding it, so the click that follows a drag landed
+        // on the pill instead of the category inside it and the filter never fired.
+        document.addEventListener('pointermove', (e) => {
+            if (!grab) return;
+            const dx = e.clientX - grab.x;
+            const dy = e.clientY - grab.y;
+            // A click wobbles a pixel or two. Below this it stays a click on a category.
+            if (!grab.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+            grab.moved = true;
+            const area = graphArea.getBoundingClientRect();
+            const maxLeft = Math.max(0, area.width - grab.width);
+            const maxTop = Math.max(0, area.height - grab.height);
+            legendEl.style.left = Math.min(Math.max(0, grab.left + dx), maxLeft) + 'px';
+            legendEl.style.top = Math.min(Math.max(0, grab.top + dy), maxTop) + 'px';
+            legendEl.style.right = 'auto';
+        });
+
+        const endLegendDrag = () => {
+            if (!grab) return;
+            if (grab.moved) {
+                legendDragged = true;
+                // The click that ends a drag is dispatched before this timer runs, so it
+                // gets swallowed and nothing later does. Clearing on the next pointerdown
+                // instead would leave the flag armed when a drag ends on the pill's
+                // padding, where no click follows to consume it.
+                setTimeout(() => { legendDragged = false; }, 0);
+            }
+            grab = null;
+        };
+        document.addEventListener('pointerup', endLegendDrag);
+        document.addEventListener('pointercancel', endLegendDrag);
+    }
+
     const legendItems = document.querySelectorAll('.legend-item');
     legendItems.forEach(item => {
         item.addEventListener('click', (e) => {
             e.stopPropagation();
+            // The click that closes a drag is not a category pick.
+            if (legendDragged) return;
             const category = item.getAttribute('data-category');
             if (activeCategoryFilter === category) {
                 activeCategoryFilter = null;
