@@ -782,6 +782,31 @@ document.addEventListener('DOMContentLoaded', () => {
         if (updates.length) nodesDataset.update(updates);
     }
 
+    // The resting state of the graph: everything lit, or — when a legend category is
+    // picked — that category's articles plus the concepts they reach. Hover focus is
+    // layered on top of this and falls back to it, which is why blur restores through
+    // here instead of clearing the dimming outright.
+    function restoreGraphFocus() {
+        if (!graphData || !activeCategoryFilter) {
+            applyGraphDimming(null);
+            return;
+        }
+        const keep = new Set();
+        graphData.nodes.forEach(node => {
+            if (node.type === 'article' && node.category === activeCategoryFilter) {
+                keep.add(node.id);
+            }
+        });
+        // Concepts are what tie the category to the rest of the writing, so a category
+        // highlight that stopped at the articles would cut every line it draws.
+        [...keep].forEach(id => {
+            (graphAdjacency[id] || new Set()).forEach(neighbour => {
+                if (String(neighbour).charAt(0) === 'c') keep.add(neighbour);
+            });
+        });
+        applyGraphDimming(id => keep.has(id));
+    }
+
     // The graph is derived from the article text at build time — see build_graph.py.
     // Fetched once and reused; it only changes when the site is rebuilt.
     let graphData = null;
@@ -993,6 +1018,9 @@ document.addEventListener('DOMContentLoaded', () => {
             networkInstance.once("afterDrawing", () => {
                 frameGraph();
                 animateNodesTo(entranceStart, positions);
+                // A category may have been picked before the graph was ever opened, or
+                // before a theme switch rebuilt it.
+                restoreGraphFocus();
             });
 
             // Obsidian drags the neighbourhood along with the node under the cursor. That
@@ -1102,7 +1130,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // the current state instead.
             networkInstance.on("blurNode", function () {
                 clearTimeout(graphBlurTimer);
-                graphBlurTimer = setTimeout(() => applyGraphDimming(null), 120);
+                graphBlurTimer = setTimeout(restoreGraphFocus, 120);
             });
 
             // Click node -> select article without reload overhead
@@ -1224,7 +1252,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 focusedArticleId = null; // Clear focused article
             }
             updateLegendUI();
-            initKnowledgeGraph(articles);
+            // Dimming, not a rebuild — the coordinates are precomputed and rebuilding
+            // would throw the settled layout away to show the same nodes.
+            restoreGraphFocus();
         });
     });
 
