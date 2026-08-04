@@ -710,6 +710,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let dragFollowers = null; // node being dragged plus the neighbours trailing it
     let graphEntranceRaf = null;
     let dragRedrawRaf = null; // pending repaint for the current drag, at most one a frame
+    let zoomRaf = null; // eases the view toward zoomTarget
+    let zoomTarget = null; // scale the wheel has asked for, reached over several frames
+    let zoomAnchor = null; // canvas point under the cursor, held still while the scale changes
+    let zoomWired = false; // the wheel listener outlives the network, so bind it once
 
     // Drives both the opening bloom and the settle after a drag. Node coordinates are
     // written straight onto the vis bodies and drawn once per frame — moveNode() would
@@ -738,6 +742,68 @@ document.addEventListener('DOMContentLoaded', () => {
             graphEntranceRaf = t < 1 ? requestAnimationFrame(step) : null;
         };
         graphEntranceRaf = requestAnimationFrame(step);
+    }
+
+    // vis applies a wheel notch to the scale in one jump. Taking the wheel ourselves and
+    // easing toward the scale it asked for turns that into a glide, and holding the canvas
+    // point that was under the cursor still keeps the zoom pointed where the user is
+    // looking. Only wheel is intercepted, so pinch on a trackpad still reaches vis.
+    const ZOOM_MIN = 0.05;
+    const ZOOM_MAX = 3;
+
+    function wireSmoothZoom(container) {
+        if (zoomWired || !container) return;
+        zoomWired = true;
+
+        container.addEventListener('wheel', (e) => {
+            if (!networkInstance) return;
+            e.preventDefault();
+            // vis binds its own wheel handler on this same element, and stopPropagation
+            // does not reach listeners sharing the element — without the immediate form
+            // vis still applies its jump underneath the glide.
+            e.stopImmediatePropagation();
+
+            const box = container.getBoundingClientRect();
+            const cursor = { x: e.clientX - box.left, y: e.clientY - box.top };
+            zoomAnchor = {
+                canvas: networkInstance.DOMtoCanvas(cursor),
+                cursor: cursor,
+                view: { width: box.width, height: box.height }
+            };
+
+            const from = zoomTarget === null ? networkInstance.getScale() : zoomTarget;
+            const next = from * Math.exp(-e.deltaY * 0.0015);
+            zoomTarget = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
+
+            if (zoomRaf !== null) return;
+            const step = () => {
+                if (!networkInstance || zoomTarget === null || !zoomAnchor) {
+                    zoomRaf = null;
+                    return;
+                }
+                const current = networkInstance.getScale();
+                const eased = current + (zoomTarget - current) * 0.18;
+                const done = Math.abs(zoomTarget - current) / zoomTarget < 0.002;
+                const scale = done ? zoomTarget : eased;
+
+                // Put the anchored canvas point back under the cursor at the new scale.
+                networkInstance.moveTo({
+                    scale: scale,
+                    position: {
+                        x: zoomAnchor.canvas.x - (zoomAnchor.cursor.x - zoomAnchor.view.width / 2) / scale,
+                        y: zoomAnchor.canvas.y - (zoomAnchor.cursor.y - zoomAnchor.view.height / 2) / scale
+                    }
+                });
+
+                if (done) {
+                    zoomRaf = null;
+                    zoomTarget = null;
+                    return;
+                }
+                zoomRaf = requestAnimationFrame(step);
+            };
+            zoomRaf = requestAnimationFrame(step);
+        }, { capture: true, passive: false });
     }
 
     // Centre and zoom the graph from the precomputed node coordinates. vis.fit() kept
@@ -1004,6 +1070,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (dragRedrawRaf !== null) cancelAnimationFrame(dragRedrawRaf);
             dragRedrawRaf = null;
             dragFollowers = null;
+            // A glide still in flight would keep calling moveTo on the rebuilt network and
+            // fight frameGraph for the camera.
+            if (zoomRaf !== null) cancelAnimationFrame(zoomRaf);
+            zoomRaf = null;
+            zoomTarget = null;
             networkInstance.destroy();
             networkInstance = null;
         }
@@ -1013,6 +1084,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nodesDataset = new vis.DataSet(nodesArray);
             edgesDataset = new vis.DataSet(edgesArray);
             networkInstance = new vis.Network(container, { nodes: nodesDataset, edges: edgesDataset }, options);
+            wireSmoothZoom(container);
 
             // Frame the view from the coordinates we generated rather than vis.fit(),
             // which repeatedly measured a stale canvas here and left the graph parked in a
@@ -1066,8 +1138,67 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                dragFollowers = { id: draggedId, start: { x: pos[draggedId].x, y: pos[draggedId].y }, followers };
+                // Everything that is not being carried gets shouldered aside when the
+                // moving clump runs into it. Their resting coordinates are captured now
+                // so each frame can push from the original position rather than from the
+                // last pushed one — pushing incrementally makes them drift away and never
+                // come back.
+                const movingIds = new Set(followers.map(f => f.id));
+                movingIds.add(draggedId);
+                const bystanders = [];
+                Object.keys(pos).forEach(id => {
+                    if (!movingIds.has(id)) bystanders.push({ id: id, home: pos[id] });
+                });
+
+                dragFollowers = {
+                    id: draggedId,
+                    start: { x: pos[draggedId].x, y: pos[draggedId].y },
+                    followers: followers,
+                    movers: [draggedId].concat(followers.map(f => f.id)),
+                    bystanders: bystanders,
+                    shoved: new Set() // ids actually moved, so only those animate back
+                };
             });
+
+            // How close a carried node gets before it starts pushing, and how much of
+            // that overlap it actually converts into a shove. Full strength turns the
+            // clump into a snowplough; this reads as things being nudged out of the way.
+            const SHOVE_RADIUS = 55;
+            const SHOVE_STRENGTH = 0.55;
+
+            function shoveBystanders(bodies) {
+                const state = dragFollowers;
+                const radius2 = SHOVE_RADIUS * SHOVE_RADIUS;
+                for (let i = 0; i < state.bystanders.length; i++) {
+                    const other = state.bystanders[i];
+                    const body = bodies[other.id];
+                    if (!body) continue;
+                    let pushX = 0;
+                    let pushY = 0;
+                    for (let m = 0; m < state.movers.length; m++) {
+                        const mover = bodies[state.movers[m]];
+                        if (!mover) continue;
+                        const dx = other.home.x - mover.x;
+                        const dy = other.home.y - mover.y;
+                        const dist2 = dx * dx + dy * dy;
+                        if (dist2 >= radius2 || dist2 === 0) continue;
+                        const dist = Math.sqrt(dist2);
+                        const overlap = (SHOVE_RADIUS - dist) / dist;
+                        pushX += dx * overlap;
+                        pushY += dy * overlap;
+                    }
+                    if (pushX !== 0 || pushY !== 0) {
+                        body.x = other.home.x + pushX * SHOVE_STRENGTH;
+                        body.y = other.home.y + pushY * SHOVE_STRENGTH;
+                        state.shoved.add(other.id);
+                    } else if (state.shoved.has(other.id)) {
+                        // Out of range again — back home, no animation needed mid-drag.
+                        body.x = other.home.x;
+                        body.y = other.home.y;
+                        state.shoved.delete(other.id);
+                    }
+                }
+            }
 
             // Not gated on params.nodes: vis does not always report the dragged node on
             // this event, and dragStart already told us which one is being moved.
@@ -1087,6 +1218,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     body.x = f.start.x + dx * f.pull;
                     body.y = f.start.y + dy * f.pull;
                 });
+                shoveBystanders(bodies);
                 // A mouse reporting faster than the display fires several of these between
                 // frames, and each one repainted 357 nodes and 699 edges that nobody saw.
                 // Coalescing to one repaint a frame keeps the last positions and drops the
@@ -1112,12 +1244,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (!dragFollowers) return;
                 const settling = dragFollowers.followers;
+                // Whatever got shouldered aside relaxes back with the followers, so the
+                // graph is exactly where it was apart from the node that was moved.
+                const shovedHomes = dragFollowers.bystanders
+                    .filter(b => dragFollowers.shoved.has(b.id));
                 dragFollowers = null;
-                if (!settling.length) return;
+                if (!settling.length && !shovedHomes.length) return;
 
-                const from = networkInstance.getPositions(settling.map(f => f.id));
+                const ids = settling.map(f => f.id).concat(shovedHomes.map(b => b.id));
+                const from = networkInstance.getPositions(ids);
                 const to = {};
                 settling.forEach(f => { to[f.id] = f.start; });
+                shovedHomes.forEach(b => { to[b.id] = b.home; });
                 animateNodesTo(from, to, 320);
             });
 
