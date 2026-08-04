@@ -926,7 +926,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const labelColor = isDark ? '#cccccc' : '#4b5563';
         const conceptFill = isDark ? '#5a5f6a' : '#c9ced8';
+        // Fallback only — used when an edge's source node has no category to read a
+        // colour from, which should not happen once the legend has loaded.
         const edgeIdle = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(17, 24, 39, 0.12)';
+        // getComputedStyle hands back "rgb(r, g, b)"; edges want that tinted and
+        // translucent rather than the flat dot colour, or 699 of them stacked over each
+        // other read as a solid smear instead of a graph.
+        function tint(rgbString, alpha) {
+            const m = rgbString.match(/[\d.]+/g);
+            return m ? `rgba(${m[0]}, ${m[1]}, ${m[2]}, ${alpha})` : edgeIdle;
+        }
         // The focused subgraph has to read as a different layer, not a lighter shade of
         // the same one — that contrast is the whole point of the hover state.
         const edgeFocus = isDark ? '#4facfe' : '#2f7fd4';
@@ -949,10 +958,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const positions = {};
         const entranceStart = {};
+        const nodeById = {};
         data.nodes.forEach(node => {
             positions[node.id] = { x: node.x, y: node.y };
             // Everything starts pulled in toward the centre and blooms outward.
             entranceStart[node.id] = { x: node.x * 0.25, y: node.y * 0.25 };
+            nodeById[node.id] = node;
         });
 
         const pts = Object.values(positions);
@@ -997,11 +1008,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // 2. Edges come straight from the build. Arrows only on article→concept links,
-        // which are directed; the article↔article ones are similarity and are not.
+        // which are directed; the article↔article ones are similarity and are not. Each
+        // edge takes its colour from the article it starts at (build_graph.py always
+        // orders from/to so "from" is the article side, never the concept), so a cluster
+        // reads as one hue instead of the flat grey mesh it was before.
         graphAdjacency = {};
         const edgesArray = data.edges.map((edge, idx) => {
             (graphAdjacency[edge.from] = graphAdjacency[edge.from] || new Set()).add(edge.to);
             (graphAdjacency[edge.to] = graphAdjacency[edge.to] || new Set()).add(edge.from);
+            const sourceCategory = nodeById[edge.from] && nodeById[edge.from].category;
+            const sourceMeta = categories[sourceCategory];
             return {
                 id: 'e' + idx,
                 from: edge.from,
@@ -1009,7 +1025,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 arrows: edge.to.charAt(0) === 'c'
                     ? { to: { enabled: true, scaleFactor: 0.35 } }
                     : undefined,
-                color: { color: edgeIdle }
+                color: { color: sourceMeta ? tint(sourceMeta.color, isDark ? 0.30 : 0.35) : edgeIdle }
             };
         });
 
@@ -1164,7 +1180,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // that overlap it actually converts into a shove. Full strength turns the
             // clump into a snowplough; this reads as things being nudged out of the way.
             const SHOVE_RADIUS = 55;
-            const SHOVE_STRENGTH = 0.55;
+            const SHOVE_STRENGTH = 0.85;
 
             function shoveBystanders(bodies) {
                 const state = dragFollowers;
