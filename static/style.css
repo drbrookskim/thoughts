@@ -327,6 +327,13 @@ html, body {
     gap: 6px;
 }
 
+/* The title is a bare <h3> in the markup (see app.js), so it was rendering at the
+   browser's default h3 size (~1.17em) with no rule of its own. Sized down to h5's
+   default (~0.83em) here. */
+.article-item h3 {
+    font-size: 13px;
+}
+
 .article-item:hover {
     background: var(--bg-surface-hover);
     border-color: var(--border-pill);
