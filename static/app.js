@@ -996,7 +996,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 color: {
                     background: fill,
                     border: fill,
-                    highlight: { background: fill, border: edgeFocus },
+                    // Dragging selects the node, which draws this border — it used to be
+                    // the fixed hover-focus blue regardless of the node's own colour.
+                    // Matching fill keeps the dot reading as itself while it moves.
+                    highlight: { background: fill, border: fill },
                     hover: { background: fill, border: edgeFocus }
                 },
                 font: {
@@ -1025,7 +1028,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 arrows: edge.to.charAt(0) === 'c'
                     ? { to: { enabled: true, scaleFactor: 0.35 } }
                     : undefined,
-                color: { color: sourceMeta ? tint(sourceMeta.color, isDark ? 0.30 : 0.35) : edgeIdle }
+                color: {
+                    color: sourceMeta ? tint(sourceMeta.color, isDark ? 0.30 : 0.35) : edgeIdle,
+                    // Dragging selects the node and, via selectConnectedEdges, its edges —
+                    // drawn in this colour instead of the global default. Per edge rather
+                    // than a single options.edges.color.highlight, which would paint every
+                    // dragged node's edges the same fixed hue no matter whose they are.
+                    highlight: sourceMeta ? tint(sourceMeta.color, isDark ? 0.85 : 0.9) : edgeIdle
+                }
             };
         });
 
@@ -1048,10 +1058,13 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             edges: {
                 width: 1,
-                // vis already redraws the hovered node's edges in these colours, which is
+                // vis already redraws the hovered node's edges in this colour, which is
                 // the whole focus effect — the per-edge dataset writes it used to take
-                // were overwritten by this at draw time anyway.
-                color: { hover: edgeFocus, highlight: edgeFocus },
+                // were overwritten by this at draw time anyway. highlight (the drag/select
+                // state) is deliberately not set here — each edge carries its own in the
+                // dataset above, so a dragged node's edges match that node's colour
+                // instead of every drag painting the same fixed hue.
+                color: { hover: edgeFocus },
                 hoverWidth: 1,
                 selectionWidth: 1,
                 // Straight lines: 1257 curved edges cost more to draw than they add, and
