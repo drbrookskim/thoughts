@@ -1318,6 +1318,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             });
+
+            // Double-click node -> open the article. A single click already focuses it
+            // in place (dimming, sidebar highlight) without leaving the graph; this is
+            // the deliberate step past that, into the reader tab.
+            networkInstance.on("doubleClick", function (params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = String(params.nodes[0]);
+                    if (nodeId.charAt(0) === 'a') {
+                        const articleId = parseInt(nodeId.slice(1), 10);
+                        if (!isNaN(articleId)) {
+                            focusedArticleId = articleId;
+                            selectArticle(articleId, true, true);
+                        }
+                    }
+                }
+            });
         }
     }
 
