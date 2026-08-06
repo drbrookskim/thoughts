@@ -780,9 +780,10 @@ html, body {
 .graph-legend {
     position: absolute;
     top: 16px;
-    right: 16px;
+    left: 50%;
+    transform: translateX(-50%);
     /* Four of the widest items plus their gaps and the pill padding — enough to keep
-       the seven categories on two rows instead of trickling down the right edge. */
+       the seven categories on two rows instead of trickling down either edge. */
     max-width: min(460px, calc(100% - 32px));
     background: var(--bg-base);
     border: 1px solid var(--border-hairline);
@@ -792,7 +793,7 @@ html, body {
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: center;
     z-index: 5;
     cursor: move;
     /* The pill is dragged with pointer events; without this a touch drag scrolls the

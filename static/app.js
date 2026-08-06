@@ -1457,6 +1457,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // A click wobbles a pixel or two. Below this it stays a click on a category.
             if (!grab.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
             grab.moved = true;
+            // Default position is centred via CSS transform: translateX(-50%). left/top
+            // alone would leave that shift applied on top of them, landing the pill half
+            // its own width away from the cursor the moment a drag starts.
+            legendEl.style.transform = 'none';
             const area = graphArea.getBoundingClientRect();
             const maxLeft = Math.max(0, area.width - grab.width);
             const maxTop = Math.max(0, area.height - grab.height);
