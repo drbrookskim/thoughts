@@ -157,6 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (tabWriteBtn) tabWriteBtn.classList.remove('active');
             graphViewContainer.classList.add('hidden');
             if (writeView) writeView.classList.add('hidden');
+            setSidebarCollapsed(false);
         }
 
         // Toggle active classes in list
@@ -473,6 +474,7 @@ document.addEventListener('DOMContentLoaded', () => {
         welcomeView.classList.add('hidden');
         articleView.classList.add('hidden');
         if (writeView) writeView.classList.add('hidden');
+        syncSidebarToggleUI();
 
         // Always re-initialize the graph to reflect any new article selection focus.
         // The graph data is fetched, so the redraw has to wait on it rather than on a
@@ -494,6 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tabWriteBtn) tabWriteBtn.classList.remove('active');
         graphViewContainer.classList.add('hidden');
         if (writeView) writeView.classList.add('hidden');
+        setSidebarCollapsed(false);
 
         if (activeArticleId) {
             articleView.classList.remove('hidden');
@@ -514,6 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
             welcomeView.classList.add('hidden');
             articleView.classList.add('hidden');
             if (writeView) writeView.classList.remove('hidden');
+            setSidebarCollapsed(false);
 
             // Reset fields
             if (writeTitle) writeTitle.value = '';
@@ -1526,6 +1530,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialTheme = localStorage.getItem('drbrooks-theme') || 'light';
     applyTheme(initialTheme);
 
+
+    // ==========================================================================
+    // ↔️  SIDEBAR COLLAPSE (graph view only)
+    // ==========================================================================
+    const appContainer = document.querySelector('.app-container');
+    const sidebarCollapseBtn = document.getElementById('sidebar-collapse-btn');
+    const sidebarExpandBtn = document.getElementById('sidebar-expand-btn');
+
+    // The sidebar takes 380px out of the flex row. Collapsing changes the canvas width,
+    // and the graph is framed from a measured width — so it has to be reframed after the
+    // slide finishes, not while it is still moving.
+    function setSidebarCollapsed(collapsed) {
+        if (!appContainer) return;
+        const changed = appContainer.classList.contains('sidebar-collapsed') !== collapsed;
+        appContainer.classList.toggle('sidebar-collapsed', collapsed);
+        syncSidebarToggleUI();
+        if (!changed) return; // called on every tab switch; only reframe on a real move
+        setTimeout(() => {
+            if (!networkInstance) return;
+            networkInstance.redraw();
+            frameGraph();
+        }, 300); // just past the 0.28s slide
+    }
+
+    // Both buttons only make sense over the graph. On the reader they would hide the
+    // article list with nothing gained, so they are withdrawn and any collapse undone.
+    function syncSidebarToggleUI() {
+        if (!appContainer) return;
+        const onGraph = tabGraphBtn.classList.contains('active');
+        const collapsed = appContainer.classList.contains('sidebar-collapsed');
+        if (sidebarCollapseBtn) sidebarCollapseBtn.classList.toggle('hidden', !onGraph || collapsed);
+        if (sidebarExpandBtn) sidebarExpandBtn.classList.toggle('hidden', !onGraph || !collapsed);
+    }
+
+    if (sidebarCollapseBtn) {
+        sidebarCollapseBtn.addEventListener('click', () => setSidebarCollapsed(true));
+    }
+    if (sidebarExpandBtn) {
+        sidebarExpandBtn.addEventListener('click', () => setSidebarCollapsed(false));
+    }
 
     // ==========================================================================
     // 📱 MOBILE SIDEBAR TOGGLE

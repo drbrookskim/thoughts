@@ -15,7 +15,7 @@
     <!-- Marked.js for fast client-side markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- Stylesheet -->
-    <link rel="stylesheet" href="./static/style.css?v=20260806-legend-center">
+    <link rel="stylesheet" href="./static/style.css?v=20260806-sidebar-collapse">
     <script>
         (function() {
             const savedTheme = localStorage.getItem('drbrooks-theme') || 'light';
@@ -54,6 +54,9 @@
                 <div class="brand-text">
                     <h1>Dr. Brooks Thoughts</h1>
                 </div>
+                <button class="sidebar-collapse-btn hidden" id="sidebar-collapse-btn" title="사이드바 접기" aria-label="사이드바 접기">
+                    <i class="fa-solid fa-angles-left"></i>
+                </button>
             </div>
 
             <!-- Stats Overview -->
@@ -121,6 +124,11 @@
             <!-- 1. Obsidian style Knowledge Graph View -->
             <div class="graph-view hidden" id="graph-view-container">
 
+                <!-- Lives inside the graph view, not the sidebar: it has to stay reachable
+                     once the sidebar has slid off-screen. -->
+                <button class="sidebar-expand-btn hidden" id="sidebar-expand-btn" title="사이드바 펼치기" aria-label="사이드바 펼치기">
+                    <i class="fa-solid fa-angles-right"></i>
+                </button>
                 <div id="graph-canvas"></div>
                 <div class="graph-legend">
                     <span class="legend-item" data-category="기획론"><span class="dot planning-theory"></span>기획론</span>
@@ -265,7 +273,7 @@
     </div>
 
     <!-- JavaScript logic -->
-    <script src="./static/app.js?v=20260806-legend-center"></script>
+    <script src="./static/app.js?v=20260806-sidebar-collapse"></script>
 
     <!-- 🌌 Constellation Particle Network Background Script -->
     <script>

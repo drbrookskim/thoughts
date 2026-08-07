@@ -164,6 +164,57 @@ html, body {
     gap: 14px;
 }
 
+/* Collapse/expand controls. Only shown while the knowledge graph is open — that is
+   the view that benefits from the extra width; the reader does not. */
+.sidebar-collapse-btn,
+.sidebar-expand-btn {
+    background: transparent;
+    border: 1px solid var(--border-hairline);
+    color: var(--text-secondary);
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-pill);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: var(--transition-smooth);
+}
+
+.sidebar-collapse-btn {
+    /* Pushed to the far right of the brand row, past the title. */
+    margin-left: auto;
+}
+
+.sidebar-collapse-btn:hover,
+.sidebar-expand-btn:hover {
+    border-color: var(--border-pill);
+    color: var(--text-primary);
+    background: var(--bg-surface-hover);
+}
+
+.sidebar-expand-btn {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 6;
+    background: var(--bg-base);
+}
+
+/* The sidebar keeps its place in the flex row and slides out of it, so the graph
+   canvas reflows into the freed width rather than being overlapped. */
+.sidebar {
+    transition: margin-left 0.28s ease, opacity 0.2s ease;
+}
+
+.app-container.sidebar-collapsed .sidebar {
+    margin-left: -380px;
+    opacity: 0;
+    pointer-events: none;
+}
+
 .logo-icon {
     width: 38px;
     height: 38px;
