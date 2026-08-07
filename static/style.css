@@ -833,17 +833,19 @@ html, body {
     top: 16px;
     left: 50%;
     transform: translateX(-50%);
-    /* Four of the widest items plus their gaps and the pill padding — enough to keep
-       the seven categories on two rows instead of trickling down either edge. */
-    max-width: min(460px, calc(100% - 32px));
+    /* Sized to its contents so the seven categories stay on one line. No max-width
+       cap — capping the pill is what forced the wrap in the first place. */
+    max-width: none;
     background: var(--bg-base);
     border: 1px solid var(--border-hairline);
     border-radius: var(--radius-pill);
-    padding: 8px 16px;
+    padding: 8px 14px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
+    /* Tight enough that all seven still fit the pane beside a 380px sidebar on a
+       1100px window, which is where the single row would otherwise spill over. */
+    gap: 8px;
+    flex-wrap: nowrap;
     justify-content: center;
     z-index: 5;
     cursor: move;
@@ -863,10 +865,14 @@ html, body {
     align-items: center;
     gap: 6px;
     cursor: pointer;
-    padding: 4px 12px;
+    padding: 4px 10px;
     border-radius: var(--radius-pill);
     border: 1px solid var(--border-hairline);
     transition: var(--transition-smooth);
+    /* Keep each chip at its natural width on the single row — flex would otherwise
+       squeeze them and break the labels across lines. */
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .legend-item:hover {
